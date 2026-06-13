@@ -1361,7 +1361,7 @@ function LedgerSection({ transactions, onAdd, onDelete, recurringItems, onAddRec
 // ----------------------------------------------------------------------------
 // 메인 앱
 // ----------------------------------------------------------------------------
-function AdminDashboard() {
+function AdminDashboard({ onLogout }) {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [users, setUsers] = useState(initialUsers);
   const [ledger, setLedger] = useState([]);
@@ -1617,10 +1617,17 @@ function AdminDashboard() {
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
               관
             </div>
-            <div className="leading-tight">
+            <div className="leading-tight flex-1">
               <p className="text-sm font-semibold text-slate-700">관리자</p>
               <p className="text-xs text-slate-400">admin@example.com</p>
             </div>
+            <button
+              onClick={onLogout}
+              className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+              title="로그아웃"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
       </aside>
@@ -1799,7 +1806,108 @@ function AdminDashboard() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<AdminDashboard />);
+// ----------------------------------------------------------------------------
+// 로그인 화면
+// ----------------------------------------------------------------------------
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async () => {
+    if (!email || !password) { setError("이메일과 비밀번호를 입력해주세요."); return; }
+    setLoading(true);
+    setError("");
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (err) {
+      setError("이메일 또는 비밀번호가 올바르지 않아요.");
+    } else {
+      onLogin(data.session);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-100">
+        <div className="mb-8 flex flex-col items-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white mb-3">A</div>
+          <h1 className="text-xl font-bold text-slate-800">관리자 로그인</h1>
+          <p className="mt-1 text-sm text-slate-400">Admin Dashboard</p>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">이메일</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="admin@example.com"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">비밀번호</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+
+          {error && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-500">{error}</p>
+          )}
+
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {loading ? "로그인 중..." : "로그인"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 앱 루트 (로그인 상태 관리)
+// ----------------------------------------------------------------------------
+function App() {
+  const [session, setSession] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setChecking(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (checking) return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
+      로딩 중...
+    </div>
+  );
+
+  if (!session) return <LoginPage onLogin={setSession} />;
+
+  return <AdminDashboard onLogout={() => supabase.auth.signOut()} />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 } catch (err) {
   document.getElementById("root").innerHTML =
     '<div style="padding:20px;font-family:monospace;color:#b91c1c;white-space:pre-wrap;font-size:12px;line-height:1.6;">' +
