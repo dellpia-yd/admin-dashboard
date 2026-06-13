@@ -346,12 +346,27 @@ function LedgerChart({ transactions }) {
 // ----------------------------------------------------------------------------
 function LedgerSection({ transactions, onAdd, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterType, setFilterType] = useState("all"); // all | year | month | range
+  const [filterYear, setFilterYear] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
 
+  const availableYears = Array.from(new Set(transactions.map((t) => t.date.slice(0, 4)))).sort().reverse();
   const availableMonths = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7)))).sort().reverse();
 
-  const filtered =
-    filterMonth === "all" ? transactions : transactions.filter((t) => t.date.slice(0, 7) === filterMonth);
+  let filtered = transactions;
+  if (filterType === "year" && filterYear) {
+    filtered = transactions.filter((t) => t.date.slice(0, 4) === filterYear);
+  } else if (filterType === "month" && filterMonth) {
+    filtered = transactions.filter((t) => t.date.slice(0, 7) === filterMonth);
+  } else if (filterType === "range" && (rangeStart || rangeEnd)) {
+    filtered = transactions.filter((t) => {
+      if (rangeStart && t.date < rangeStart) return false;
+      if (rangeEnd && t.date > rangeEnd) return false;
+      return true;
+    });
+  }
 
   const totalIncome = filtered.filter((t) => t.type === "수입").reduce((s, t) => s + t.amount, 0);
   const totalExpense = filtered.filter((t) => t.type === "지출").reduce((s, t) => s + t.amount, 0);
@@ -362,20 +377,66 @@ function LedgerSection({ transactions, onAdd, onDelete }) {
   return (
     <div className="space-y-4">
       {/* 기간 필터 */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm text-slate-500">기간</label>
         <select
-          value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value)}
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="all">전체</option>
-          {availableMonths.map((m) => (
-            <option key={m} value={m}>
-              {m.slice(0, 4)}년 {m.slice(5)}월
-            </option>
-          ))}
+          <option value="year">연도별</option>
+          <option value="month">월별</option>
+          <option value="range">기간 직접 선택</option>
         </select>
+
+        {filterType === "year" && (
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          >
+            <option value="">연도 선택</option>
+            {availableYears.map((y) => (
+              <option key={y} value={y}>
+                {y}년
+              </option>
+            ))}
+          </select>
+        )}
+
+        {filterType === "month" && (
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          >
+            <option value="">월 선택</option>
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {m.slice(0, 4)}년 {m.slice(5)}월
+              </option>
+            ))}
+          </select>
+        )}
+
+        {filterType === "range" && (
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={rangeStart}
+              onChange={(e) => setRangeStart(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+            <span className="text-slate-400">~</span>
+            <input
+              type="date"
+              value={rangeEnd}
+              onChange={(e) => setRangeEnd(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+        )}
       </div>
 
       {/* 요약 카드 */}
