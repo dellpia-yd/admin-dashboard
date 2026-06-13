@@ -42,14 +42,6 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ----------------------------------------------------------------------------
 // 샘플 데이터 (실제 서비스에서는 API/DB에서 불러오면 됩니다)
 // ----------------------------------------------------------------------------
-const initialUsers = [
-  { id: 1, name: "김민준", email: "minjun.kim@example.com", role: "관리자", status: "활성", joined: "2024-01-12" },
-  { id: 2, name: "이서연", email: "seoyeon.lee@example.com", role: "일반", status: "활성", joined: "2024-03-02" },
-  { id: 3, name: "박도윤", email: "doyun.park@example.com", role: "일반", status: "정지", joined: "2024-05-20" },
-  { id: 4, name: "최지우", email: "jiwoo.choi@example.com", role: "일반", status: "활성", joined: "2024-06-15" },
-  { id: 5, name: "정하은", email: "haeun.jung@example.com", role: "매니저", status: "활성", joined: "2024-08-09" },
-];
-
 const navItems = [
   { id: "dashboard", label: "대시보드", icon: "▦" },
   { id: "users", label: "회원 관리", icon: "👤" },
@@ -1363,7 +1355,8 @@ function LedgerSection({ transactions, onAdd, onDelete, recurringItems, onAddRec
 // ----------------------------------------------------------------------------
 function AdminDashboard({ onLogout }) {
   const [activeNav, setActiveNav] = useState("dashboard");
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [ledger, setLedger] = useState([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [recurring, setRecurring] = useState([]);
@@ -1376,6 +1369,16 @@ function AdminDashboard({ onLogout }) {
   const [modalUser, setModalUser] = useState(null); // null = closed, {} = 추가, user = 수정
   const [openMenuId, setOpenMenuId] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 회원 데이터 불러오기
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data, error } = await supabase.from("members").select("*").order("created_at", { ascending: false });
+      if (!error && data) setUsers(data);
+      setUsersLoading(false);
+    };
+    fetchUsers();
+  }, []);
 
   // 가계부 데이터를 Supabase에서 불러오기
   useEffect(() => {
@@ -1447,17 +1450,29 @@ function AdminDashboard({ onLogout }) {
       u.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSaveUser = (form) => {
+  const handleSaveUser = async (form) => {
     if (form.id) {
-      setUsers((prev) => prev.map((u) => (u.id === form.id ? form : u)));
+      const { data, error } = await supabase
+        .from("members")
+        .update({ name: form.name, email: form.email, role: form.role, status: form.status, joined: form.joined })
+        .eq("id", form.id).select();
+      if (!error && data) setUsers((prev) => prev.map((u) => u.id === form.id ? data[0] : u));
+      else alert("수정 중 오류: " + error?.message);
     } else {
-      setUsers((prev) => [...prev, { ...form, id: Math.max(0, ...prev.map((u) => u.id)) + 1 }]);
+      const { data, error } = await supabase
+        .from("members")
+        .insert([{ name: form.name, email: form.email, role: form.role, status: form.status, joined: form.joined }])
+        .select();
+      if (!error && data) setUsers((prev) => [data[0], ...prev]);
+      else alert("저장 중 오류: " + error?.message);
     }
     setModalUser(null);
   };
 
-  const handleDeleteUser = (id) => {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
+  const handleDeleteUser = async (id) => {
+    const { error } = await supabase.from("members").delete().eq("id", id);
+    if (!error) setUsers((prev) => prev.filter((u) => u.id !== id));
+    else alert("삭제 중 오류: " + error.message);
     setOpenMenuId(null);
   };
 
@@ -1678,6 +1693,9 @@ function AdminDashboard({ onLogout }) {
           )}
 
           {activeNav === "users" && (
+            usersLoading ? (
+              <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
+            ) : (
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
               <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <div className="relative sm:hidden">
@@ -1768,6 +1786,7 @@ function AdminDashboard({ onLogout }) {
                 </table>
               </div>
             </div>
+            )
           )}
 
           {activeNav === "products" && (
