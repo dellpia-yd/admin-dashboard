@@ -28,6 +28,7 @@ window.addEventListener('error', function (e) {
 </script>
 
 <script type="text/babel" data-presets="react">
+try {
 const { useState, useRef, useEffect } = React;
 
 // ----------------------------------------------------------------------------
@@ -939,6 +940,14 @@ function AdminDashboard() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<AdminDashboard />);
+} catch (err) {
+  document.getElementById("root").innerHTML =
+    '<div style="padding:20px;font-family:monospace;color:#b91c1c;white-space:pre-wrap;font-size:12px;line-height:1.6;">' +
+    '오류 발생 (코드):\n' +
+    (err && err.message ? err.message : String(err)) + '\n\n' +
+    (err && err.stack ? err.stack : '') +
+    '</div>';
+}
 </script>
 </body>
 </html>
