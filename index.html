@@ -349,6 +349,102 @@ function LedgerChart({ transactions }) {
 }
 
 // ----------------------------------------------------------------------------
+// 가계부: 카테고리별 지출 도넛 차트 (Chart.js)
+// ----------------------------------------------------------------------------
+const CATEGORY_COLORS = [
+  "#6366f1", "#fb7185", "#34d399", "#fbbf24", "#38bdf8", "#a78bfa", "#f472b6", "#94a3b8",
+];
+
+function CategoryChart({ transactions }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+
+  const expenses = transactions.filter((t) => t.type === "지출");
+  const totals = {};
+  expenses.forEach((t) => {
+    totals[t.category] = (totals[t.category] || 0) + t.amount;
+  });
+  const labels = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  const values = labels.map((l) => totals[l]);
+  const total = values.reduce((a, b) => a + b, 0);
+
+  useEffect(() => {
+    if (chartRef.current) chartRef.current.destroy();
+    if (labels.length === 0) return;
+
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: labels.map((_, i) => CATEGORY_COLORS[i % CATEGORY_COLORS.length]),
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
+                return `${ctx.label}: ${formatWon(ctx.parsed)} (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      if (chartRef.current) chartRef.current.destroy();
+    };
+  }, [transactions]);
+
+  if (labels.length === 0) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm text-slate-400">
+        해당 기간의 지출 내역이 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="h-56 w-56 shrink-0 mx-auto">
+        <canvas ref={canvasRef} />
+      </div>
+      <div className="flex-1 space-y-2">
+        {labels.map((label, i) => {
+          const pct = total ? Math.round((totals[label] / total) * 100) : 0;
+          return (
+            <div key={label} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
+                />
+                <span className="text-slate-600">{label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">{pct}%</span>
+                <span className="font-medium text-slate-700">{formatWon(totals[label])}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // 가계부: 메인 섹션
 // ----------------------------------------------------------------------------
 function LedgerSection({ transactions, onAdd, onDelete }) {
@@ -471,6 +567,12 @@ function LedgerSection({ transactions, onAdd, onDelete }) {
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
         <p className="mb-3 text-sm font-semibold text-slate-700">월별 수입 / 지출</p>
         <LedgerChart transactions={transactions} />
+      </div>
+
+      {/* 카테고리별 지출 (선택한 기간 기준) */}
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <p className="mb-3 text-sm font-semibold text-slate-700">카테고리별 지출</p>
+        <CategoryChart transactions={filtered} />
       </div>
 
       {/* 내역 테이블 */}
