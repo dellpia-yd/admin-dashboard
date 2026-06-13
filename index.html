@@ -42,16 +42,7 @@ const navItems = [
 const expenseCategories = ["식비", "교통", "주거/통신", "문화/여가", "의료", "쇼핑", "기타"];
 const incomeCategories = ["월급", "용돈", "부수입", "기타"];
 
-const initialLedger = [
-  { id: 1, type: "수입", category: "월급", amount: 3200000, date: "2026-05-25", memo: "5월 급여" },
-  { id: 2, type: "지출", category: "주거/통신", amount: 850000, date: "2026-05-26", memo: "월세" },
-  { id: 3, type: "지출", category: "식비", amount: 320000, date: "2026-06-01", memo: "장보기" },
-  { id: 4, type: "지출", category: "교통", amount: 65000, date: "2026-06-03", memo: "대중교통" },
-  { id: 5, type: "지출", category: "문화/여가", amount: 48000, date: "2026-06-05", memo: "영화" },
-  { id: 6, type: "수입", category: "월급", amount: 3200000, date: "2026-06-25", memo: "6월 급여" },
-  { id: 7, type: "지출", category: "주거/통신", amount: 850000, date: "2026-06-26", memo: "월세" },
-  { id: 8, type: "지출", category: "쇼핑", amount: 120000, date: "2026-06-10", memo: "옷" },
-];
+const initialLedger = [];
 
 const statCards = [
   { label: "전체 회원", value: "12,480", delta: "+128 (이번 주)", accent: "bg-indigo-500" },
@@ -355,15 +346,38 @@ function LedgerChart({ transactions }) {
 // ----------------------------------------------------------------------------
 function LedgerSection({ transactions, onAdd, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [filterMonth, setFilterMonth] = useState("all");
 
-  const totalIncome = transactions.filter((t) => t.type === "수입").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = transactions.filter((t) => t.type === "지출").reduce((s, t) => s + t.amount, 0);
+  const availableMonths = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7)))).sort().reverse();
+
+  const filtered =
+    filterMonth === "all" ? transactions : transactions.filter((t) => t.date.slice(0, 7) === filterMonth);
+
+  const totalIncome = filtered.filter((t) => t.type === "수입").reduce((s, t) => s + t.amount, 0);
+  const totalExpense = filtered.filter((t) => t.type === "지출").reduce((s, t) => s + t.amount, 0);
   const balance = totalIncome - totalExpense;
 
-  const sorted = [...transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
     <div className="space-y-4">
+      {/* 기간 필터 */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-slate-500">기간</label>
+        <select
+          value={filterMonth}
+          onChange={(e) => setFilterMonth(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+        >
+          <option value="all">전체</option>
+          {availableMonths.map((m) => (
+            <option key={m} value={m}>
+              {m.slice(0, 4)}년 {m.slice(5)}월
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* 요약 카드 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
@@ -385,7 +399,7 @@ function LedgerSection({ transactions, onAdd, onDelete }) {
         </div>
       </div>
 
-      {/* 차트 */}
+      {/* 차트 (전체 기간 흐름은 항상 전체 데이터 기준) */}
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
         <p className="mb-3 text-sm font-semibold text-slate-700">월별 수입 / 지출</p>
         <LedgerChart transactions={transactions} />
@@ -394,7 +408,7 @@ function LedgerSection({ transactions, onAdd, onDelete }) {
       {/* 내역 테이블 */}
       <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
         <div className="flex items-center justify-between px-6 py-4">
-          <p className="text-sm text-slate-400">총 {transactions.length}건</p>
+          <p className="text-sm text-slate-400">총 {filtered.length}건</p>
           <button
             onClick={() => setModalOpen(true)}
             className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
@@ -451,7 +465,7 @@ function LedgerSection({ transactions, onAdd, onDelete }) {
               {sorted.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
-                    아직 등록된 내역이 없습니다.
+                    {filterMonth === "all" ? "아직 등록된 내역이 없습니다." : "해당 기간에 등록된 내역이 없습니다."}
                   </td>
                 </tr>
               )}
