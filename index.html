@@ -164,6 +164,187 @@ function PlaceholderSection({ title }) {
 }
 
 // ----------------------------------------------------------------------------
+// 설정 페이지
+// ----------------------------------------------------------------------------
+function SettingsSection({ onLogout }) {
+  const [siteSettings, setSiteSettings] = useState({ site_name: "", site_description: "", notification_email: true, notification_system: true, id: null });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const [profile, setProfile] = useState({ email: "", name: "" });
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user) {
+        setProfile({ email: authData.user.email || "", name: authData.user.user_metadata?.name || "" });
+      }
+      const { data, error } = await supabase.from("settings").select("*").limit(1).single();
+      if (!error && data) setSiteSettings(data);
+      setSettingsLoading(false);
+    };
+    fetchSettings();
+  }, []);
+
+  const handleSaveSettings = async () => {
+    const { error } = await supabase.from("settings")
+      .update({ site_name: siteSettings.site_name, site_description: siteSettings.site_description, notification_email: siteSettings.notification_email, notification_system: siteSettings.notification_system, updated_at: new Date().toISOString() })
+      .eq("id", siteSettings.id);
+    if (!error) { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2000); }
+    else alert("저장 중 오류: " + error.message);
+  };
+
+  const handleSaveProfile = async () => {
+    const { error } = await supabase.auth.updateUser({ data: { name: profile.name } });
+    if (!error) { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2000); }
+    else alert("저장 중 오류: " + error.message);
+  };
+
+  const handleChangePassword = async () => {
+    setPwError(""); setPwSuccess(false);
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError("모든 항목을 입력해주세요."); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError("새 비밀번호가 일치하지 않아요."); return; }
+    if (pwForm.next.length < 6) { setPwError("비밀번호는 6자 이상이어야 해요."); return; }
+    setPwLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: pwForm.next });
+    setPwLoading(false);
+    if (!error) { setPwSuccess(true); setPwForm({ current: "", next: "", confirm: "" }); }
+    else setPwError("비밀번호 변경 중 오류: " + error.message);
+  };
+
+  if (settingsLoading) return (
+    <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* 관리자 정보 */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">관리자 정보</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">이름</label>
+            <input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
+              placeholder="이름 입력"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">이메일 (변경 불가)</label>
+            <input value={profile.email} disabled
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400" />
+          </div>
+          <button onClick={handleSaveProfile}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            {profileSaved ? "저장됐어요 ✓" : "저장"}
+          </button>
+        </div>
+      </div>
+
+      {/* 비밀번호 변경 */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">비밀번호 변경</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">현재 비밀번호</label>
+            <input type="password" value={pwForm.current} onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">새 비밀번호</label>
+            <input type="password" value={pwForm.next} onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">새 비밀번호 확인</label>
+            <input type="password" value={pwForm.confirm} onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+              placeholder="••••••••"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          {pwError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-500">{pwError}</p>}
+          {pwSuccess && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-600">비밀번호가 변경됐어요 ✓</p>}
+          <button onClick={handleChangePassword} disabled={pwLoading}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
+            {pwLoading ? "변경 중..." : "비밀번호 변경"}
+          </button>
+        </div>
+      </div>
+
+      {/* 사이트 기본 정보 */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">사이트 기본 정보</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">사이트명</label>
+            <input value={siteSettings.site_name}
+              onChange={(e) => setSiteSettings((s) => ({ ...s, site_name: e.target.value }))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-500">사이트 설명</label>
+            <textarea value={siteSettings.site_description}
+              onChange={(e) => setSiteSettings((s) => ({ ...s, site_description: e.target.value }))}
+              rows={3} placeholder="사이트 설명을 입력해주세요"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none" />
+          </div>
+          <button onClick={handleSaveSettings}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            {settingsSaved ? "저장됐어요 ✓" : "저장"}
+          </button>
+        </div>
+      </div>
+
+      {/* 알림 설정 */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">알림 설정</h3>
+        <div className="space-y-3">
+          {[
+            { key: "notification_email", label: "이메일 알림", desc: "주요 활동을 이메일로 받기" },
+            { key: "notification_system", label: "시스템 알림", desc: "앱 내 알림 받기" },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-700">{label}</p>
+                <p className="text-xs text-slate-400">{desc}</p>
+              </div>
+              <button
+                onClick={() => setSiteSettings((s) => ({ ...s, [key]: !s[key] }))}
+                className={`relative h-6 w-11 rounded-full transition-colors ${siteSettings[key] ? "bg-indigo-600" : "bg-slate-200"}`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${siteSettings[key] ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+          ))}
+          <button onClick={handleSaveSettings}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            {settingsSaved ? "저장됐어요 ✓" : "저장"}
+          </button>
+        </div>
+      </div>
+
+      {/* 로그아웃 */}
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-2 text-sm font-semibold text-slate-700">계정</h3>
+        <p className="mb-4 text-xs text-slate-400">로그아웃하면 다시 로그인 화면으로 이동해요.</p>
+        <button onClick={onLogout}
+          className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-500 hover:bg-rose-50">
+          로그아웃
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+
+// ----------------------------------------------------------------------------
 // 상품 관리: 모달
 // ----------------------------------------------------------------------------
 const productCategories = ["의류", "식품", "전자기기", "생활용품", "뷰티", "기타"];
@@ -1814,7 +1995,7 @@ function AdminDashboard({ onLogout }) {
               />
             )
           )}
-          {activeNav === "settings" && <PlaceholderSection title="설정" />}
+          {activeNav === "settings" && <SettingsSection onLogout={onLogout} />}
         </div>
       </main>
 
