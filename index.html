@@ -57,12 +57,8 @@ const navItems = [
 const expenseCategories = ["식비", "교통", "주거/통신", "문화/여가", "의료", "쇼핑", "기타"];
 const incomeCategories = ["월급", "용돈", "부수입", "기타"];
 
-const statCards = [
-  { label: "전체 회원", value: "12,480", delta: "+128 (이번 주)", accent: "bg-indigo-500" },
-  { label: "활성 상품", value: "326", delta: "+12 (이번 주)", accent: "bg-emerald-500" },
-  { label: "게시글", value: "1,902", delta: "+34 (이번 주)", accent: "bg-amber-500" },
-  { label: "오늘 매출", value: "₩4,820,000", delta: "+8.2%", accent: "bg-rose-500" },
-];
+
+
 
 // ----------------------------------------------------------------------------
 // 회원 추가/수정 모달
@@ -1546,6 +1542,8 @@ function AdminDashboard({ onLogout }) {
   const [productsLoading, setProductsLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [dashStats, setDashStats] = useState({ members: 0, activeProducts: 0, posts: 0, monthIncome: 0 });
+  const [dashLoading, setDashLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modalUser, setModalUser] = useState(null); // null = closed, {} = 추가, user = 수정
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -1559,6 +1557,34 @@ function AdminDashboard({ onLogout }) {
       setUsersLoading(false);
     };
     fetchUsers();
+  }, []);
+
+  // 대시보드 통계 불러오기
+  useEffect(() => {
+    const fetchStats = async () => {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const thisMonth = `${yyyy}-${mm}`;
+
+      const [membersRes, productsRes, postsRes, ledgerRes] = await Promise.all([
+        supabase.from("members").select("id", { count: "exact", head: true }),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "판매중"),
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "게시중"),
+        supabase.from("ledger").select("amount, type").eq("type", "수입").gte("date", `${thisMonth}-01`),
+      ]);
+
+      const monthIncome = (ledgerRes.data || []).reduce((s, t) => s + t.amount, 0);
+
+      setDashStats({
+        members: membersRes.count || 0,
+        activeProducts: productsRes.count || 0,
+        posts: postsRes.count || 0,
+        monthIncome,
+      });
+      setDashLoading(false);
+    };
+    fetchStats();
   }, []);
 
   // 가계부 데이터를 Supabase에서 불러오기
@@ -1857,18 +1883,21 @@ function AdminDashboard({ onLogout }) {
         <div className="p-4 md:p-8">
           {activeNav === "dashboard" && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {statCards.map((card) => (
+              {[
+                { label: "전체 회원", value: dashLoading ? "..." : dashStats.members.toLocaleString() + "명", accent: "bg-indigo-500" },
+                { label: "활성 상품", value: dashLoading ? "..." : dashStats.activeProducts.toLocaleString() + "개", accent: "bg-emerald-500" },
+                { label: "게시 중인 글", value: dashLoading ? "..." : dashStats.posts.toLocaleString() + "개", accent: "bg-amber-500" },
+                { label: "이번 달 수입", value: dashLoading ? "..." : formatWon(dashStats.monthIncome), accent: "bg-rose-500" },
+              ].map((card) => (
                 <div key={card.label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
                   <div className={`mb-3 h-1.5 w-10 rounded-full ${card.accent}`} />
                   <p className="text-sm text-slate-400">{card.label}</p>
                   <p className="mt-1 text-2xl font-bold text-slate-800">{card.value}</p>
-                  <p className="mt-1 text-xs font-medium text-emerald-500">{card.delta}</p>
                 </div>
               ))}
 
               <div className="col-span-full mt-2 rounded-2xl bg-white p-6 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">
-                여기에 차트, 최근 활동 로그, 알림 등을 추가할 수 있어요. 왼쪽 메뉴에서 "회원 관리"를
-                눌러 실제 데이터 테이블 예시를 확인해보세요.
+                왼쪽 메뉴에서 각 항목을 눌러 데이터를 관리할 수 있어요. 가계부, 회원, 상품, 게시글 모두 실시간으로 저장돼요.
               </div>
             </div>
           )}
