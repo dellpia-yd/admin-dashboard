@@ -4,2101 +4,64 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard</title>
-<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div id="root"></div>
 <script>
-window.addEventListener('error', function (e) {
-  var root = document.getElementById('root');
-  if (root) {
-    root.innerHTML =
-      '<div style="padding:20px;font-family:monospace;color:#b91c1c;white-space:pre-wrap;font-size:13px;line-height:1.6;">' +
-      '오류 발생:\n' + (e.message || '') + '\n' +
-      (e.filename ? '파일: ' + e.filename + '\n' : '') +
-      (e.lineno ? '줄: ' + e.lineno + '\n' : '') +
-      '</div>';
-  }
+window.addEventListener('error', function(e) {
+  document.getElementById('root').innerHTML =
+    '<div style="padding:20px;color:#b91c1c;font-family:monospace;white-space:pre-wrap;font-size:12px">오류 발생:\n' + e.message + '\n줄: ' + e.lineno + '</div>';
 });
 </script>
-
 <script type="text/babel" data-presets="react">
-try {
-const { useState, useRef, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
-// ----------------------------------------------------------------------------
-// Supabase 연결
-// ----------------------------------------------------------------------------
-const SUPABASE_URL = "https://wzwkheauminoswocrkgx.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6d2toZWF1bWlub3N3b2Nya2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTM1OTksImV4cCI6MjA5Njg2OTU5OX0.RU4pF4AUKELxeA3j-4fm_1uzO4VKi_enrwWjquALzzU";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SB_URL = "https://wzwkheauminoswocrkgx.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6d2toZWF1bWlub3N3b2Nya2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTM1OTksImV4cCI6MjA5Njg2OTU5OX0.RU4pF4AUKELxeA3j-4fm_1uzO4VKi_enrwWjquALzzU";
+const db = window.supabase.createClient(SB_URL, SB_KEY);
 
-// ----------------------------------------------------------------------------
-// 샘플 데이터 (실제 서비스에서는 API/DB에서 불러오면 됩니다)
-// ----------------------------------------------------------------------------
-const navItems = [
-  { id: "dashboard", label: "대시보드", icon: "▦" },
-  { id: "users", label: "회원 관리", icon: "👤" },
-  { id: "products", label: "상품 관리", icon: "📦" },
-  { id: "posts", label: "게시글 관리", icon: "📝" },
-  { id: "ledger", label: "가계부", icon: "💰" },
-  { id: "settings", label: "설정", icon: "⚙️" },
-];
+const won = (n) => "₩" + (n||0).toLocaleString("ko-KR");
 
-// ----------------------------------------------------------------------------
-// 가계부 데이터
-// ----------------------------------------------------------------------------
-const expenseCategories = ["식비", "교통", "주거/통신", "문화/여가", "의료", "쇼핑", "기타"];
-const incomeCategories = ["월급", "용돈", "부수입", "기타"];
-
-
-
-
-// ----------------------------------------------------------------------------
-// 회원 추가/수정 모달
-// ----------------------------------------------------------------------------
-function UserModal({ user, onClose, onSave }) {
-  const [form, setForm] = useState(
-    user ?? { name: "", email: "", role: "일반", status: "활성", joined: new Date().toISOString().slice(0, 10) }
-  );
-
-  const handleChange = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">
-            {user ? "회원 정보 수정" : "회원 추가"}
-          </h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">이름</label>
-            <input
-              value={form.name}
-              onChange={handleChange("name")}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder="홍길동"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">이메일</label>
-            <input
-              value={form.email}
-              onChange={handleChange("email")}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder="email@example.com"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">역할</label>
-              <select
-                value={form.role}
-                onChange={handleChange("role")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option>관리자</option>
-                <option>매니저</option>
-                <option>일반</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">상태</label>
-              <select
-                value={form.status}
-                onChange={handleChange("status")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option>활성</option>
-                <option>정지</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
-          >
-            취소
-          </button>
-          <button
-            onClick={() => onSave(form)}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            저장
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PlaceholderSection({ title }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-24 text-center shadow-sm ring-1 ring-slate-100">
-      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 text-xl">
-        ⌄
-      </div>
-      <p className="text-sm font-medium text-slate-600">{title} 페이지는 아직 준비 중이에요</p>
-      <p className="mt-1 text-xs text-slate-400">"회원 관리"와 같은 구조로 만들어 달라고 요청해보세요.</p>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 설정 페이지
-// ----------------------------------------------------------------------------
-function SettingsSection({ onLogout }) {
-  const [siteSettings, setSiteSettings] = useState({ site_name: "", site_description: "", notification_email: true, notification_system: true, id: null });
-  const [settingsLoading, setSettingsLoading] = useState(true);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-
-  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
-  const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState(false);
-  const [pwLoading, setPwLoading] = useState(false);
-
-  const [profile, setProfile] = useState({ email: "", name: "" });
-  const [profileSaved, setProfileSaved] = useState(false);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData?.user) {
-        setProfile({ email: authData.user.email || "", name: authData.user.user_metadata?.name || "" });
-      }
-      const { data, error } = await supabase.from("settings").select("*").limit(1).single();
-      if (!error && data) setSiteSettings(data);
-      setSettingsLoading(false);
-    };
-    fetchSettings();
-  }, []);
-
-  const handleSaveSettings = async () => {
-    const { error } = await supabase.from("settings")
-      .update({ site_name: siteSettings.site_name, site_description: siteSettings.site_description, notification_email: siteSettings.notification_email, notification_system: siteSettings.notification_system, updated_at: new Date().toISOString() })
-      .eq("id", siteSettings.id);
-    if (!error) { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2000); }
-    else alert("저장 중 오류: " + error.message);
-  };
-
-  const handleSaveProfile = async () => {
-    const { error } = await supabase.auth.updateUser({ data: { name: profile.name } });
-    if (!error) { setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2000); }
-    else alert("저장 중 오류: " + error.message);
-  };
-
-  const handleChangePassword = async () => {
-    setPwError(""); setPwSuccess(false);
-    if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError("모든 항목을 입력해주세요."); return; }
-    if (pwForm.next !== pwForm.confirm) { setPwError("새 비밀번호가 일치하지 않아요."); return; }
-    if (pwForm.next.length < 6) { setPwError("비밀번호는 6자 이상이어야 해요."); return; }
-    setPwLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: pwForm.next });
-    setPwLoading(false);
-    if (!error) { setPwSuccess(true); setPwForm({ current: "", next: "", confirm: "" }); }
-    else setPwError("비밀번호 변경 중 오류: " + error.message);
-  };
-
-  if (settingsLoading) return (
-    <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
-  );
-
-  return (
-    <div className="space-y-4">
-      {/* 관리자 정보 */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700">관리자 정보</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">이름</label>
-            <input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
-              placeholder="이름 입력"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">이메일 (변경 불가)</label>
-            <input value={profile.email} disabled
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400" />
-          </div>
-          <button onClick={handleSaveProfile}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            {profileSaved ? "저장됐어요 ✓" : "저장"}
-          </button>
-        </div>
-      </div>
-
-      {/* 비밀번호 변경 */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700">비밀번호 변경</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">현재 비밀번호</label>
-            <input type="password" value={pwForm.current} onChange={(e) => setPwForm((f) => ({ ...f, current: e.target.value }))}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">새 비밀번호</label>
-            <input type="password" value={pwForm.next} onChange={(e) => setPwForm((f) => ({ ...f, next: e.target.value }))}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">새 비밀번호 확인</label>
-            <input type="password" value={pwForm.confirm} onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          {pwError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-500">{pwError}</p>}
-          {pwSuccess && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-600">비밀번호가 변경됐어요 ✓</p>}
-          <button onClick={handleChangePassword} disabled={pwLoading}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
-            {pwLoading ? "변경 중..." : "비밀번호 변경"}
-          </button>
-        </div>
-      </div>
-
-      {/* 사이트 기본 정보 */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700">사이트 기본 정보</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">사이트명</label>
-            <input value={siteSettings.site_name}
-              onChange={(e) => setSiteSettings((s) => ({ ...s, site_name: e.target.value }))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">사이트 설명</label>
-            <textarea value={siteSettings.site_description}
-              onChange={(e) => setSiteSettings((s) => ({ ...s, site_description: e.target.value }))}
-              rows={3} placeholder="사이트 설명을 입력해주세요"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none" />
-          </div>
-          <button onClick={handleSaveSettings}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            {settingsSaved ? "저장됐어요 ✓" : "저장"}
-          </button>
-        </div>
-      </div>
-
-      {/* 알림 설정 */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h3 className="mb-4 text-sm font-semibold text-slate-700">알림 설정</h3>
-        <div className="space-y-3">
-          {[
-            { key: "notification_email", label: "이메일 알림", desc: "주요 활동을 이메일로 받기" },
-            { key: "notification_system", label: "시스템 알림", desc: "앱 내 알림 받기" },
-          ].map(({ key, label, desc }) => (
-            <div key={key} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-slate-700">{label}</p>
-                <p className="text-xs text-slate-400">{desc}</p>
-              </div>
-              <button
-                onClick={() => setSiteSettings((s) => ({ ...s, [key]: !s[key] }))}
-                className={`relative h-6 w-11 rounded-full transition-colors ${siteSettings[key] ? "bg-indigo-600" : "bg-slate-200"}`}
-              >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${siteSettings[key] ? "translate-x-5" : "translate-x-0.5"}`} />
-              </button>
-            </div>
-          ))}
-          <button onClick={handleSaveSettings}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            {settingsSaved ? "저장됐어요 ✓" : "저장"}
-          </button>
-        </div>
-      </div>
-
-      {/* 로그아웃 */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-        <h3 className="mb-2 text-sm font-semibold text-slate-700">계정</h3>
-        <p className="mb-4 text-xs text-slate-400">로그아웃하면 다시 로그인 화면으로 이동해요.</p>
-        <button onClick={onLogout}
-          className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-500 hover:bg-rose-50">
-          로그아웃
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-
-// ----------------------------------------------------------------------------
-// 상품 관리: 모달
-// ----------------------------------------------------------------------------
-const productCategories = ["의류", "식품", "전자기기", "생활용품", "뷰티", "기타"];
-const productStatuses = ["판매중", "품절", "판매중지"];
-
-function ProductModal({ product, onClose, onSave }) {
-  const [form, setForm] = useState(
-    product ?? { name: "", category: productCategories[0], price: "", stock: "", status: "판매중" }
-  );
-  const handleChange = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-  const handleSubmit = () => {
-    if (!form.name || !form.price) return;
-    onSave({ ...form, price: Number(form.price), stock: Number(form.stock) });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">{product ? "상품 수정" : "상품 추가"}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
-        </div>
-        <div className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">상품명</label>
-            <input value={form.name} onChange={handleChange("name")} placeholder="상품명 입력"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">카테고리</label>
-              <select value={form.category} onChange={handleChange("category")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
-                {productCategories.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">상태</label>
-              <select value={form.status} onChange={handleChange("status")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
-                {productStatuses.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">가격 (원)</label>
-              <input type="number" inputMode="numeric" value={form.price} onChange={handleChange("price")} placeholder="0"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">재고</label>
-              <input type="number" inputMode="numeric" value={form.stock} onChange={handleChange("stock")} placeholder="0"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">취소</button>
-          <button onClick={handleSubmit} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 상품 관리: 섹션
-// ----------------------------------------------------------------------------
-function ProductSection({ products, loading, onSave, onDelete }) {
-  const [modal, setModal] = useState(null);
-  const [search, setSearch] = useState("");
-  const [openMenuId, setOpenMenuId] = useState(null);
-
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const statusColor = (s) => {
-    if (s === "판매중") return "bg-emerald-50 text-emerald-600";
-    if (s === "품절") return "bg-amber-50 text-amber-600";
-    return "bg-slate-100 text-slate-400";
-  };
-
-  if (loading) return (
-    <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
-  );
-
-  return (
-    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 상품명 검색..."
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:w-64" />
-        <button onClick={() => setModal({})}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          + 상품 추가
-        </button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-y border-slate-100 text-xs uppercase tracking-wide text-slate-400">
-              <th className="px-6 py-3 font-medium">상품명</th>
-              <th className="px-6 py-3 font-medium">카테고리</th>
-              <th className="px-6 py-3 font-medium">가격</th>
-              <th className="px-6 py-3 font-medium">재고</th>
-              <th className="px-6 py-3 font-medium">상태</th>
-              <th className="px-6 py-3 font-medium text-right">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
-                <td className="px-6 py-3 font-medium text-slate-700">{p.name}</td>
-                <td className="px-6 py-3 text-slate-500">{p.category}</td>
-                <td className="px-6 py-3 text-slate-700">{formatWon(p.price)}</td>
-                <td className="px-6 py-3 text-slate-500">{p.stock.toLocaleString()}개</td>
-                <td className="px-6 py-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColor(p.status)}`}>{p.status}</span>
-                </td>
-                <td className="relative px-6 py-3 text-right">
-                  <button onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">⋮</button>
-                  {openMenuId === p.id && (
-                    <div className="absolute right-6 top-10 z-10 w-32 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
-                      <button onClick={() => { setModal(p); setOpenMenuId(null); }}
-                        className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50">수정</button>
-                      <button onClick={() => { onDelete(p.id); setOpenMenuId(null); }}
-                        className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50">삭제</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
-                {products.length === 0 ? "등록된 상품이 없습니다." : "검색 결과가 없습니다."}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {modal !== null && (
-        <ProductModal product={modal.id ? modal : null} onClose={() => setModal(null)}
-          onSave={(form) => { onSave(form); setModal(null); }} />
-      )}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 게시글 관리: 모달
-// ----------------------------------------------------------------------------
-const postCategories = ["공지", "이벤트", "FAQ", "자유", "기타"];
-const postStatuses = ["게시중", "숨김", "삭제"];
-
-function PostModal({ post, onClose, onSave }) {
-  const [form, setForm] = useState(
-    post ?? { title: "", content: "", category: postCategories[0], status: "게시중" }
-  );
-  const handleChange = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
-  const handleSubmit = () => {
-    if (!form.title) return;
-    onSave(form);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">{post ? "게시글 수정" : "게시글 작성"}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
-        </div>
-        <div className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">제목</label>
-            <input value={form.title} onChange={handleChange("title")} placeholder="제목 입력"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">카테고리</label>
-              <select value={form.category} onChange={handleChange("category")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
-                {postCategories.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">상태</label>
-              <select value={form.status} onChange={handleChange("status")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
-                {postStatuses.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">내용</label>
-            <textarea value={form.content} onChange={handleChange("content")} rows={4} placeholder="내용 입력"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none" />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">취소</button>
-          <button onClick={handleSubmit} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 게시글 관리: 섹션
-// ----------------------------------------------------------------------------
-function PostSection({ posts, loading, onSave, onDelete }) {
-  const [modal, setModal] = useState(null);
-  const [search, setSearch] = useState("");
-  const [openMenuId, setOpenMenuId] = useState(null);
-
-  const filtered = posts.filter((p) =>
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const statusColor = (s) => {
-    if (s === "게시중") return "bg-emerald-50 text-emerald-600";
-    if (s === "숨김") return "bg-amber-50 text-amber-600";
-    return "bg-rose-50 text-rose-500";
-  };
-
-  if (loading) return (
-    <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
-  );
-
-  return (
-    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 제목 검색..."
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:w-64" />
-        <button onClick={() => setModal({})}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          + 게시글 작성
-        </button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-y border-slate-100 text-xs uppercase tracking-wide text-slate-400">
-              <th className="px-6 py-3 font-medium">제목</th>
-              <th className="px-6 py-3 font-medium">카테고리</th>
-              <th className="px-6 py-3 font-medium">상태</th>
-              <th className="px-6 py-3 font-medium">작성일</th>
-              <th className="px-6 py-3 font-medium text-right">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
-                <td className="px-6 py-3 font-medium text-slate-700">{p.title}</td>
-                <td className="px-6 py-3 text-slate-500">{p.category}</td>
-                <td className="px-6 py-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColor(p.status)}`}>{p.status}</span>
-                </td>
-                <td className="px-6 py-3 text-slate-500">{p.created_at?.slice(0, 10) || "-"}</td>
-                <td className="relative px-6 py-3 text-right">
-                  <button onClick={() => setOpenMenuId(openMenuId === p.id ? null : p.id)}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">⋮</button>
-                  {openMenuId === p.id && (
-                    <div className="absolute right-6 top-10 z-10 w-32 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
-                      <button onClick={() => { setModal(p); setOpenMenuId(null); }}
-                        className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50">수정</button>
-                      <button onClick={() => { onDelete(p.id); setOpenMenuId(null); }}
-                        className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50">삭제</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-400">
-                {posts.length === 0 ? "등록된 게시글이 없습니다." : "검색 결과가 없습니다."}
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {modal !== null && (
-        <PostModal post={modal.id ? modal : null} onClose={() => setModal(null)}
-          onSave={(form) => { onSave(form); setModal(null); }} />
-      )}
-    </div>
-  );
-}
-
-
-
-// ----------------------------------------------------------------------------
-// 가계부: 유틸
-// ----------------------------------------------------------------------------
-function formatWon(n) {
-  return "₩" + n.toLocaleString("ko-KR");
-}
-
-function exportLedgerCSV(transactions) {
-  if (!transactions || transactions.length === 0) {
-    alert("내보낼 내역이 없어요.");
-    return;
-  }
-  const header = ["날짜", "구분", "분류", "메모", "금액"];
-  const rows = transactions.map((t) => [t.date, t.type, t.category, t.memo || "", t.amount]);
-  const escapeCell = (v) => {
-    const s = String(v ?? "");
-    if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
-  };
-  const csv = [header, ...rows].map((row) => row.map(escapeCell).join(",")).join("\n");
-  // 엑셀에서 한글이 깨지지 않도록 BOM 추가
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const today = new Date().toISOString().slice(0, 10);
-  link.href = url;
-  link.download = `가계부_${today}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
-// ----------------------------------------------------------------------------
-// 가계부: 입력 모달
-// ----------------------------------------------------------------------------
-function LedgerModal({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    type: "지출",
-    category: expenseCategories[0],
-    amount: "",
-    date: new Date().toISOString().slice(0, 10),
-    memo: "",
-  });
-
-  const categories = form.type === "지출" ? expenseCategories : incomeCategories;
-
-  const handleTypeChange = (type) => {
-    const cats = type === "지출" ? expenseCategories : incomeCategories;
-    setForm((f) => ({ ...f, type, category: cats[0] }));
-  };
-
-  const handleSubmit = () => {
-    if (!form.amount || Number(form.amount) <= 0) return;
-    onSave({ ...form, amount: Number(form.amount) });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">내역 추가</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4 px-6 py-5">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleTypeChange("지출")}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-                form.type === "지출"
-                  ? "border-rose-200 bg-rose-50 text-rose-600"
-                  : "border-slate-200 text-slate-400 hover:bg-slate-50"
-              }`}
-            >
-              지출
-            </button>
-            <button
-              onClick={() => handleTypeChange("수입")}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-                form.type === "수입"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-600"
-                  : "border-slate-200 text-slate-400 hover:bg-slate-50"
-              }`}
-            >
-              수입
-            </button>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">금액</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              placeholder="0"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">분류</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">날짜</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">메모</label>
-            <input
-              value={form.memo}
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="예: 점심 식사"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            저장
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 고정 지출/수입: 입력 모달
-// ----------------------------------------------------------------------------
-function RecurringModal({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    type: "지출",
-    category: expenseCategories[0],
-    amount: "",
-    day_of_month: "1",
-    memo: "",
-  });
-
-  const categories = form.type === "지출" ? expenseCategories : incomeCategories;
-
-  const handleTypeChange = (type) => {
-    const cats = type === "지출" ? expenseCategories : incomeCategories;
-    setForm((f) => ({ ...f, type, category: cats[0] }));
-  };
-
-  const handleSubmit = () => {
-    if (!form.amount || Number(form.amount) <= 0) return;
-    const day = Math.min(31, Math.max(1, Number(form.day_of_month) || 1));
-    onSave({ ...form, amount: Number(form.amount), day_of_month: day });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">고정 지출/수입 추가</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4 px-6 py-5">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => handleTypeChange("지출")}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-                form.type === "지출"
-                  ? "border-rose-200 bg-rose-50 text-rose-600"
-                  : "border-slate-200 text-slate-400 hover:bg-slate-50"
-              }`}
-            >
-              지출
-            </button>
-            <button
-              onClick={() => handleTypeChange("수입")}
-              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-                form.type === "수입"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-600"
-                  : "border-slate-200 text-slate-400 hover:bg-slate-50"
-              }`}
-            >
-              수입
-            </button>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">금액</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              placeholder="0"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">분류</label>
-              <select
-                value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">매월 며칠</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                max="31"
-                value={form.day_of_month}
-                onChange={(e) => setForm((f) => ({ ...f, day_of_month: e.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">메모</label>
-            <input
-              value={form.memo}
-              onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))}
-              placeholder="예: 월세, 넷플릭스 구독"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          <p className="text-xs text-slate-400">
-            매월 지정한 날짜가 되면, 앱을 열 때 자동으로 가계부에 추가돼요.
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
-          >
-            취소
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            저장
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 고정 지출/수입: 관리 섹션
-// ----------------------------------------------------------------------------
-function RecurringSection({ items, onAdd, onDelete }) {
-  const [modalOpen, setModalOpen] = useState(false);
-
-  return (
-    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-700">고정 지출 / 수입</p>
-          <p className="text-xs text-slate-400">매월 지정한 날짜에 자동으로 등록돼요.</p>
-        </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          + 추가
-        </button>
-      </div>
-
-      <div className="divide-y divide-slate-50">
-        {items.length === 0 && (
-          <div className="px-6 py-8 text-center text-sm text-slate-400">등록된 고정 항목이 없습니다.</div>
-        )}
-        {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between px-6 py-3">
-            <div className="flex items-center gap-3">
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                  item.type === "수입" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"
-                }`}
-              >
-                {item.type}
-              </span>
-              <div>
-                <p className="text-sm font-medium text-slate-700">
-                  {item.category} {item.memo ? `· ${item.memo}` : ""}
-                </p>
-                <p className="text-xs text-slate-400">매월 {item.day_of_month}일</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-sm font-medium ${item.type === "수입" ? "text-emerald-600" : "text-rose-500"}`}
-              >
-                {item.type === "수입" ? "+" : "-"}
-                {formatWon(item.amount)}
-              </span>
-              <button
-                onClick={() => onDelete(item.id)}
-                className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-              >
-                삭제
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {modalOpen && (
-        <RecurringModal
-          onClose={() => setModalOpen(false)}
-          onSave={(form) => {
-            onAdd(form);
-            setModalOpen(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-
-// ----------------------------------------------------------------------------
-// 예산 설정: 모달
-// ----------------------------------------------------------------------------
-function BudgetModal({ existing, onClose, onSave }) {
-  const [category, setCategory] = useState(existing?.category || expenseCategories[0]);
-  const [amount, setAmount] = useState(existing?.amount || "");
-
-  const handleSubmit = () => {
-    if (!amount || Number(amount) <= 0) return;
-    onSave({ category, amount: Number(amount), id: existing?.id });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-800">예산 설정</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">✕</button>
-        </div>
-        <div className="space-y-4 px-6 py-5">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">카테고리</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              disabled={!!existing}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50"
-            >
-              {expenseCategories.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">월 한도 금액</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100">취소</button>
-          <button onClick={handleSubmit} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 예산 설정: 섹션
-// ----------------------------------------------------------------------------
-function BudgetSection({ budgets, transactions, onSave, onDelete }) {
-  const [modalItem, setModalItem] = useState(null); // null=닫힘, {}=새항목, budget=수정
-
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, "0");
-  const thisMonth = `${yyyy}-${mm}`;
-
-  const monthlyExpenses = {};
-  transactions
-    .filter((t) => t.type === "지출" && t.date.slice(0, 7) === thisMonth)
-    .forEach((t) => {
-      monthlyExpenses[t.category] = (monthlyExpenses[t.category] || 0) + t.amount;
-    });
-
-  return (
-    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-700">카테고리별 예산</p>
-          <p className="text-xs text-slate-400">이번 달({yyyy}년 {mm}월) 기준으로 표시돼요.</p>
-        </div>
-        <button
-          onClick={() => setModalItem({})}
-          className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          + 예산 추가
-        </button>
-      </div>
-
-      <div className="divide-y divide-slate-50 px-6 pb-4">
-        {budgets.length === 0 && (
-          <div className="py-8 text-center text-sm text-slate-400">설정된 예산이 없습니다.</div>
-        )}
-        {budgets.map((b) => {
-          const spent = monthlyExpenses[b.category] || 0;
-          const pct = Math.min(100, Math.round((spent / b.amount) * 100));
-          const isOver = spent > b.amount;
-          return (
-            <div key={b.id} className="py-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-slate-700">{b.category}</span>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className={isOver ? "font-semibold text-rose-500" : "text-slate-500"}>
-                    {formatWon(spent)}
-                  </span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-slate-400">{formatWon(b.amount)}</span>
-                  <button
-                    onClick={() => setModalItem(b)}
-                    className="ml-1 rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-100"
-                  >수정</button>
-                  <button
-                    onClick={() => onDelete(b.id)}
-                    className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-                  >삭제</button>
-                </div>
-              </div>
-              <div className="h-2 w-full rounded-full bg-slate-100">
-                <div
-                  className={`h-2 rounded-full transition-all ${isOver ? "bg-rose-400" : pct >= 80 ? "bg-amber-400" : "bg-emerald-400"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-0.5 text-right text-xs text-slate-400">
-                {isOver ? (
-                  <span className="text-rose-500">한도 초과 {formatWon(spent - b.amount)}</span>
-                ) : (
-                  <span>남은 예산 {formatWon(b.amount - spent)}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {modalItem !== null && (
-        <BudgetModal
-          existing={modalItem.id ? modalItem : null}
-          onClose={() => setModalItem(null)}
-          onSave={(form) => { onSave(form); setModalItem(null); }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 가계부: 월별 수입/지출 차트 (Chart.js)
-// ----------------------------------------------------------------------------
-function LedgerChart({ transactions }) {
-  const canvasRef = useRef(null);
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    const months = {};
-    transactions.forEach((t) => {
-      const m = t.date.slice(0, 7); // YYYY-MM
-      if (!months[m]) months[m] = { income: 0, expense: 0 };
-      if (t.type === "수입") months[m].income += t.amount;
-      else months[m].expense += t.amount;
-    });
-    const labels = Object.keys(months).sort();
-    const incomeData = labels.map((m) => months[m].income);
-    const expenseData = labels.map((m) => months[m].expense);
-
-    if (chartRef.current) chartRef.current.destroy();
-
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "bar",
-      data: {
-        labels: labels.map((m) => m.slice(5) + "월"),
-        datasets: [
-          { label: "수입", data: incomeData, backgroundColor: "#34d399", borderRadius: 6 },
-          { label: "지출", data: expenseData, backgroundColor: "#fb7185", borderRadius: 6 },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: (v) => (v >= 1000000 ? v / 1000000 + "M" : v >= 1000 ? v / 1000 + "K" : v),
-              font: { size: 11 },
-            },
-          },
-          x: { ticks: { font: { size: 11 } } },
-        },
-      },
-    });
-
-    return () => {
-      if (chartRef.current) chartRef.current.destroy();
-    };
-  }, [transactions]);
-
-  return (
-    <div className="h-64">
-      <canvas ref={canvasRef} />
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 가계부: 카테고리별 지출 도넛 차트 (Chart.js)
-// ----------------------------------------------------------------------------
-const CATEGORY_COLORS = [
-  "#6366f1", "#fb7185", "#34d399", "#fbbf24", "#38bdf8", "#a78bfa", "#f472b6", "#94a3b8",
-];
-
-function CategoryChart({ transactions }) {
-  const canvasRef = useRef(null);
-  const chartRef = useRef(null);
-
-  const expenses = transactions.filter((t) => t.type === "지출");
-  const totals = {};
-  expenses.forEach((t) => {
-    totals[t.category] = (totals[t.category] || 0) + t.amount;
-  });
-  const labels = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
-  const values = labels.map((l) => totals[l]);
-  const total = values.reduce((a, b) => a + b, 0);
-
-  useEffect(() => {
-    if (chartRef.current) chartRef.current.destroy();
-    if (labels.length === 0) return;
-
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "doughnut",
-      data: {
-        labels,
-        datasets: [
-          {
-            data: values,
-            backgroundColor: labels.map((_, i) => CATEGORY_COLORS[i % CATEGORY_COLORS.length]),
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: "62%",
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
-                return `${ctx.label}: ${formatWon(ctx.parsed)} (${pct}%)`;
-              },
-            },
-          },
-        },
-      },
-    });
-
-    return () => {
-      if (chartRef.current) chartRef.current.destroy();
-    };
-  }, [transactions]);
-
-  if (labels.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center text-sm text-slate-400">
-        해당 기간의 지출 내역이 없습니다.
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div className="h-56 w-56 shrink-0 mx-auto">
-        <canvas ref={canvasRef} />
-      </div>
-      <div className="flex-1 space-y-2">
-        {labels.map((label, i) => {
-          const pct = total ? Math.round((totals[label] / total) * 100) : 0;
-          return (
-            <div key={label} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}
-                />
-                <span className="text-slate-600">{label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400">{pct}%</span>
-                <span className="font-medium text-slate-700">{formatWon(totals[label])}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 가계부: 메인 섹션
-// ----------------------------------------------------------------------------
-function LedgerSection({ transactions, onAdd, onDelete, recurringItems, onAddRecurring, onDeleteRecurring, budgets, onSaveBudget, onDeleteBudget }) {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [filterType, setFilterType] = useState("all"); // all | year | month | range
-  const [filterYear, setFilterYear] = useState("");
-  const [filterMonth, setFilterMonth] = useState("");
-  const [rangeStart, setRangeStart] = useState("");
-  const [rangeEnd, setRangeEnd] = useState("");
-
-  const availableYears = Array.from(new Set(transactions.map((t) => t.date.slice(0, 4)))).sort().reverse();
-  const availableMonths = Array.from(new Set(transactions.map((t) => t.date.slice(0, 7)))).sort().reverse();
-
-  let filtered = transactions;
-  if (filterType === "year" && filterYear) {
-    filtered = transactions.filter((t) => t.date.slice(0, 4) === filterYear);
-  } else if (filterType === "month" && filterMonth) {
-    filtered = transactions.filter((t) => t.date.slice(0, 7) === filterMonth);
-  } else if (filterType === "range" && (rangeStart || rangeEnd)) {
-    filtered = transactions.filter((t) => {
-      if (rangeStart && t.date < rangeStart) return false;
-      if (rangeEnd && t.date > rangeEnd) return false;
-      return true;
-    });
-  }
-
-  const totalIncome = filtered.filter((t) => t.type === "수입").reduce((s, t) => s + t.amount, 0);
-  const totalExpense = filtered.filter((t) => t.type === "지출").reduce((s, t) => s + t.amount, 0);
-  const balance = totalIncome - totalExpense;
-
-  const sorted = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
-
-  return (
-    <div className="space-y-4">
-      {/* 기간 필터 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm text-slate-500">기간</label>
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-        >
-          <option value="all">전체</option>
-          <option value="year">연도별</option>
-          <option value="month">월별</option>
-          <option value="range">기간 직접 선택</option>
-        </select>
-
-        {filterType === "year" && (
-          <select
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          >
-            <option value="">연도 선택</option>
-            {availableYears.map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
-        )}
-
-        {filterType === "month" && (
-          <select
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          >
-            <option value="">월 선택</option>
-            {availableMonths.map((m) => (
-              <option key={m} value={m}>
-                {m.slice(0, 4)}년 {m.slice(5)}월
-              </option>
-            ))}
-          </select>
-        )}
-
-        {filterType === "range" && (
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={rangeStart}
-              onChange={(e) => setRangeStart(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-            <span className="text-slate-400">~</span>
-            <input
-              type="date"
-              value={rangeEnd}
-              onChange={(e) => setRangeEnd(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 h-1.5 w-10 rounded-full bg-emerald-500" />
-          <p className="text-sm text-slate-400">총 수입</p>
-          <p className="mt-1 text-2xl font-bold text-slate-800">{formatWon(totalIncome)}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 h-1.5 w-10 rounded-full bg-rose-500" />
-          <p className="text-sm text-slate-400">총 지출</p>
-          <p className="mt-1 text-2xl font-bold text-slate-800">{formatWon(totalExpense)}</p>
-        </div>
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-          <div className="mb-3 h-1.5 w-10 rounded-full bg-indigo-500" />
-          <p className="text-sm text-slate-400">잔액</p>
-          <p className={`mt-1 text-2xl font-bold ${balance >= 0 ? "text-slate-800" : "text-rose-500"}`}>
-            {formatWon(balance)}
-          </p>
-        </div>
-      </div>
-
-      {/* 차트 (전체 기간 흐름은 항상 전체 데이터 기준) */}
-      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-        <p className="mb-3 text-sm font-semibold text-slate-700">월별 수입 / 지출</p>
-        <LedgerChart transactions={transactions} />
-      </div>
-
-      {/* 카테고리별 지출 (선택한 기간 기준) */}
-      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-        <p className="mb-3 text-sm font-semibold text-slate-700">카테고리별 지출</p>
-        <CategoryChart transactions={filtered} />
-      </div>
-
-      {/* 내역 테이블 */}
-      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-        <div className="flex items-center justify-between px-6 py-4">
-          <p className="text-sm text-slate-400">총 {filtered.length}건</p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => exportLedgerCSV(sorted)}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              CSV 내보내기
-            </button>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              + 내역 추가
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-y border-slate-100 text-xs uppercase tracking-wide text-slate-400">
-                <th className="px-6 py-3 font-medium">날짜</th>
-                <th className="px-6 py-3 font-medium">구분</th>
-                <th className="px-6 py-3 font-medium">분류</th>
-                <th className="px-6 py-3 font-medium">메모</th>
-                <th className="px-6 py-3 font-medium text-right">금액</th>
-                <th className="px-6 py-3 font-medium text-right">관리</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((t) => (
-                <tr key={t.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
-                  <td className="px-6 py-3 text-slate-500">{t.date}</td>
-                  <td className="px-6 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        t.type === "수입" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"
-                      }`}
-                    >
-                      {t.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-slate-500">{t.category}</td>
-                  <td className="px-6 py-3 text-slate-500">{t.memo || "-"}</td>
-                  <td
-                    className={`px-6 py-3 text-right font-medium ${
-                      t.type === "수입" ? "text-emerald-600" : "text-rose-500"
-                    }`}
-                  >
-                    {t.type === "수입" ? "+" : "-"}
-                    {formatWon(t.amount)}
-                  </td>
-                  <td className="px-6 py-3 text-right">
-                    <button
-                      onClick={() => onDelete(t.id)}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-                    >
-                      삭제
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {sorted.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
-                    {filterType === "all" ? "아직 등록된 내역이 없습니다." : "해당 기간에 등록된 내역이 없습니다."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 카테고리별 예산 */}
-      <BudgetSection budgets={budgets} transactions={transactions} onSave={onSaveBudget} onDelete={onDeleteBudget} />
-
-      {/* 고정 지출 / 수입 */}
-      <RecurringSection items={recurringItems} onAdd={onAddRecurring} onDelete={onDeleteRecurring} />
-
-      {modalOpen && (
-        <LedgerModal
-          onClose={() => setModalOpen(false)}
-          onSave={(form) => {
-            onAdd(form);
-            setModalOpen(false);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 메인 앱
-// ----------------------------------------------------------------------------
-function AdminDashboard({ onLogout }) {
-  const [activeNav, setActiveNav] = useState("dashboard");
-  const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [ledger, setLedger] = useState([]);
-  const [ledgerLoading, setLedgerLoading] = useState(true);
-  const [recurring, setRecurring] = useState([]);
-  const [budgets, setBudgets] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [posts, setPosts] = useState([]);
-  const [postsLoading, setPostsLoading] = useState(true);
-  const [dashStats, setDashStats] = useState({ members: 0, activeProducts: 0, posts: 0, monthIncome: 0 });
-  const [dashLoading, setDashLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [modalUser, setModalUser] = useState(null); // null = closed, {} = 추가, user = 수정
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // 회원 데이터 불러오기
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const { data, error } = await supabase.from("members").select("*").order("created_at", { ascending: false });
-      if (!error && data) setUsers(data);
-      setUsersLoading(false);
-    };
-    fetchUsers();
-  }, []);
-
-  // 대시보드 통계 불러오기
-  useEffect(() => {
-    const fetchStats = async () => {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const thisMonth = `${yyyy}-${mm}`;
-
-      const [membersRes, productsRes, postsRes, ledgerRes] = await Promise.all([
-        supabase.from("members").select("id", { count: "exact", head: true }),
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "판매중"),
-        supabase.from("posts").select("id", { count: "exact", head: true }).eq("status", "게시중"),
-        supabase.from("ledger").select("amount, type").eq("type", "수입").gte("date", `${thisMonth}-01`),
-      ]);
-
-      const monthIncome = (ledgerRes.data || []).reduce((s, t) => s + t.amount, 0);
-
-      setDashStats({
-        members: membersRes.count || 0,
-        activeProducts: productsRes.count || 0,
-        posts: postsRes.count || 0,
-        monthIncome,
-      });
-      setDashLoading(false);
-    };
-    fetchStats();
-  }, []);
-
-  // 가계부 데이터를 Supabase에서 불러오기
-  useEffect(() => {
-    const fetchLedger = async () => {
-      const { data, error } = await supabase
-        .from("ledger")
-        .select("*")
-        .order("date", { ascending: false });
-      if (!error && data) setLedger(data);
-      setLedgerLoading(false);
-    };
-    fetchLedger();
-  }, []);
-
-  // 고정 지출/수입 항목을 불러오고, 이번 달 아직 등록 안 된 항목 자동 추가
-  useEffect(() => {
-    const fetchRecurring = async () => {
-      const { data, error } = await supabase
-        .from("recurring_items")
-        .select("*")
-        .eq("active", true)
-        .order("day_of_month", { ascending: true });
-      if (!error && data) setRecurring(data);
-    };
-    fetchRecurring();
-  }, []);
-
-  useEffect(() => {
-    if (ledgerLoading || recurring.length === 0) return;
-
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const currentDay = today.getDate();
-
-    const toAdd = recurring.filter((item) => {
-      if (currentDay < item.day_of_month) return false;
-      const alreadyExists = ledger.some(
-        (t) => t.recurring_id === item.id && t.date.slice(0, 7) === `${yyyy}-${mm}`
-      );
-      return !alreadyExists;
-    });
-
-    if (toAdd.length === 0) return;
-
-    const insertAll = async () => {
-      const entries = toAdd.map((item) => {
-        const day = String(Math.min(item.day_of_month, 28)).padStart(2, "0");
-        return {
-          type: item.type,
-          category: item.category,
-          amount: item.amount,
-          date: `${yyyy}-${mm}-${day}`,
-          memo: item.memo,
-          recurring_id: item.id,
-        };
-      });
-      const { data, error } = await supabase.from("ledger").insert(entries).select();
-      if (!error && data) {
-        setLedger((prev) => [...prev, ...data]);
-      }
-    };
-    insertAll();
-  }, [ledgerLoading, recurring, ledger]);
-
-  const filteredUsers = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleSaveUser = async (form) => {
-    if (form.id) {
-      const { data, error } = await supabase
-        .from("members")
-        .update({ name: form.name, email: form.email, role: form.role, status: form.status, joined: form.joined })
-        .eq("id", form.id).select();
-      if (!error && data) setUsers((prev) => prev.map((u) => u.id === form.id ? data[0] : u));
-      else alert("수정 중 오류: " + error?.message);
-    } else {
-      const { data, error } = await supabase
-        .from("members")
-        .insert([{ name: form.name, email: form.email, role: form.role, status: form.status, joined: form.joined }])
-        .select();
-      if (!error && data) setUsers((prev) => [data[0], ...prev]);
-      else alert("저장 중 오류: " + error?.message);
-    }
-    setModalUser(null);
-  };
-
-  const handleDeleteUser = async (id) => {
-    const { error } = await supabase.from("members").delete().eq("id", id);
-    if (!error) setUsers((prev) => prev.filter((u) => u.id !== id));
-    else alert("삭제 중 오류: " + error.message);
-    setOpenMenuId(null);
-  };
-
-  const handleAddLedger = async (entry) => {
-    const { data, error } = await supabase.from("ledger").insert([entry]).select();
-    if (!error && data) {
-      setLedger((prev) => [...prev, ...data]);
-    } else {
-      alert("저장 중 오류가 발생했어요: " + (error?.message || "알 수 없는 오류"));
-    }
-  };
-
-  const handleDeleteLedger = async (id) => {
-    const { error } = await supabase.from("ledger").delete().eq("id", id);
-    if (!error) {
-      setLedger((prev) => prev.filter((t) => t.id !== id));
-    } else {
-      alert("삭제 중 오류가 발생했어요: " + error.message);
-    }
-  };
-
-  const handleAddRecurring = async (item) => {
-    const { data, error } = await supabase.from("recurring_items").insert([item]).select();
-    if (!error && data) {
-      setRecurring((prev) => [...prev, ...data]);
-    } else {
-      alert("저장 중 오류가 발생했어요: " + (error?.message || "알 수 없는 오류"));
-    }
-  };
-
-  const handleDeleteRecurring = async (id) => {
-    const { error } = await supabase.from("recurring_items").delete().eq("id", id);
-    if (!error) {
-      setRecurring((prev) => prev.filter((r) => r.id !== id));
-    } else {
-      alert("삭제 중 오류가 발생했어요: " + error.message);
-    }
-  };
-
-  // 예산 불러오기
-  useEffect(() => {
-    const fetchBudgets = async () => {
-      const { data, error } = await supabase.from("budgets").select("*").order("category");
-      if (!error && data) setBudgets(data);
-    };
-    fetchBudgets();
-  }, []);
-
-  const handleSaveBudget = async (form) => {
-    if (form.id) {
-      const { data, error } = await supabase
-        .from("budgets").update({ amount: form.amount }).eq("id", form.id).select();
-      if (!error && data) setBudgets((prev) => prev.map((b) => b.id === form.id ? data[0] : b));
-      else alert("수정 중 오류: " + error?.message);
-    } else {
-      const { data, error } = await supabase.from("budgets").insert([{ category: form.category, amount: form.amount }]).select();
-      if (!error && data) setBudgets((prev) => [...prev, ...data]);
-      else alert("저장 중 오류: " + error?.message);
-    }
-  };
-
-  const handleDeleteBudget = async (id) => {
-    const { error } = await supabase.from("budgets").delete().eq("id", id);
-    if (!error) setBudgets((prev) => prev.filter((b) => b.id !== id));
-    else alert("삭제 중 오류: " + error.message);
-  };
-
-  // 상품 불러오기
-  useEffect(() => {
-    const fetch = async () => {
-      const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
-      if (!error && data) setProducts(data);
-      setProductsLoading(false);
-    };
-    fetch();
-  }, []);
-
-  const handleSaveProduct = async (form) => {
-    if (form.id) {
-      const { data, error } = await supabase.from("products").update({ name: form.name, category: form.category, price: form.price, stock: form.stock, status: form.status }).eq("id", form.id).select();
-      if (!error && data) setProducts((prev) => prev.map((p) => p.id === form.id ? data[0] : p));
-      else alert("수정 중 오류: " + error?.message);
-    } else {
-      const { data, error } = await supabase.from("products").insert([{ name: form.name, category: form.category, price: form.price, stock: form.stock, status: form.status }]).select();
-      if (!error && data) setProducts((prev) => [data[0], ...prev]);
-      else alert("저장 중 오류: " + error?.message);
-    }
-  };
-
-  const handleDeleteProduct = async (id) => {
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (!error) setProducts((prev) => prev.filter((p) => p.id !== id));
-    else alert("삭제 중 오류: " + error.message);
-  };
-
-  // 게시글 불러오기
-  useEffect(() => {
-    const fetch = async () => {
-      const { data, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false });
-      if (!error && data) setPosts(data);
-      setPostsLoading(false);
-    };
-    fetch();
-  }, []);
-
-  const handleSavePost = async (form) => {
-    if (form.id) {
-      const { data, error } = await supabase.from("posts").update({ title: form.title, content: form.content, category: form.category, status: form.status }).eq("id", form.id).select();
-      if (!error && data) setPosts((prev) => prev.map((p) => p.id === form.id ? data[0] : p));
-      else alert("수정 중 오류: " + error?.message);
-    } else {
-      const { data, error } = await supabase.from("posts").insert([{ title: form.title, content: form.content, category: form.category, status: form.status }]).select();
-      if (!error && data) setPosts((prev) => [data[0], ...prev]);
-      else alert("저장 중 오류: " + error?.message);
-    }
-  };
-
-  const handleDeletePost = async (id) => {
-    const { error } = await supabase.from("posts").delete().eq("id", id);
-    if (!error) setPosts((prev) => prev.filter((p) => p.id !== id));
-    else alert("삭제 중 오류: " + error.message);
-  };
-
-  return (
-    <div className="flex h-screen w-full bg-slate-50 text-slate-800">
-      {/* 사이드바 */}
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform md:relative md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center gap-2 px-6 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-            A
-          </div>
-          <span className="text-lg font-bold text-slate-800">Admin</span>
-        </div>
-
-        <nav className="mt-2 flex-1 space-y-1 px-3">
-          {navItems.map((item) => {
-            const isActive = activeNav === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => { setActiveNav(item.id); setSidebarOpen(false); }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive
-                    ? "bg-indigo-50 text-indigo-600"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                }`}
-              >
-                <span className="text-base">{item.icon}</span>
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-slate-100 px-4 py-4">
-          <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
-              관
-            </div>
-            <div className="leading-tight flex-1">
-              <p className="text-sm font-semibold text-slate-700">관리자</p>
-              <p className="text-xs text-slate-400">admin@example.com</p>
-            </div>
-            <button
-              onClick={onLogout}
-              className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-              title="로그아웃"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/30 md:hidden" />
-      )}
-
-      {/* 메인 영역 */}
-      <main className="flex-1 overflow-y-auto">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 md:px-8">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden">
-              ☰
-            </button>
-            <h1 className="text-xl font-bold text-slate-800">
-              {navItems.find((n) => n.id === activeNav)?.label}
-            </h1>
-          </div>
-          <div className="relative hidden sm:block">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="검색..."
-              className="w-64 rounded-lg border border-slate-200 bg-slate-50 px-9 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-        </header>
-
-        <div className="p-4 md:p-8">
-          {activeNav === "dashboard" && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { label: "전체 회원", value: dashLoading ? "..." : dashStats.members.toLocaleString() + "명", accent: "bg-indigo-500" },
-                { label: "활성 상품", value: dashLoading ? "..." : dashStats.activeProducts.toLocaleString() + "개", accent: "bg-emerald-500" },
-                { label: "게시 중인 글", value: dashLoading ? "..." : dashStats.posts.toLocaleString() + "개", accent: "bg-amber-500" },
-                { label: "이번 달 수입", value: dashLoading ? "..." : formatWon(dashStats.monthIncome), accent: "bg-rose-500" },
-              ].map((card) => (
-                <div key={card.label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
-                  <div className={`mb-3 h-1.5 w-10 rounded-full ${card.accent}`} />
-                  <p className="text-sm text-slate-400">{card.label}</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-800">{card.value}</p>
-                </div>
-              ))}
-
-              <div className="col-span-full mt-2 rounded-2xl bg-white p-6 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">
-                왼쪽 메뉴에서 각 항목을 눌러 데이터를 관리할 수 있어요. 가계부, 회원, 상품, 게시글 모두 실시간으로 저장돼요.
-              </div>
-            </div>
-          )}
-
-          {activeNav === "users" && (
-            usersLoading ? (
-              <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">불러오는 중...</div>
-            ) : (
-            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
-              <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div className="relative sm:hidden">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="검색..."
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-9 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                  />
-                </div>
-                <p className="text-sm text-slate-400">총 {filteredUsers.length}명</p>
-                <button
-                  onClick={() => setModalUser({})}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                >
-                  + 회원 추가
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-y border-slate-100 text-xs uppercase tracking-wide text-slate-400">
-                      <th className="px-6 py-3 font-medium">이름</th>
-                      <th className="px-6 py-3 font-medium">이메일</th>
-                      <th className="px-6 py-3 font-medium">역할</th>
-                      <th className="px-6 py-3 font-medium">상태</th>
-                      <th className="px-6 py-3 font-medium">가입일</th>
-                      <th className="px-6 py-3 font-medium text-right">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
-                        <td className="px-6 py-3 font-medium text-slate-700">{u.name}</td>
-                        <td className="px-6 py-3 text-slate-500">{u.email}</td>
-                        <td className="px-6 py-3 text-slate-500">{u.role}</td>
-                        <td className="px-6 py-3">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                              u.status === "활성"
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-rose-50 text-rose-500"
-                            }`}
-                          >
-                            {u.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 text-slate-500">{u.joined}</td>
-                        <td className="relative px-6 py-3 text-right">
-                          <button
-                            onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-                          >
-                            ⋮
-                          </button>
-                          {openMenuId === u.id && (
-                            <div className="absolute right-6 top-10 z-10 w-32 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
-                              <button
-                                onClick={() => {
-                                  setModalUser(u);
-                                  setOpenMenuId(null);
-                                }}
-                                className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
-                              >
-                                수정
-                              </button>
-                              <button
-                                onClick={() => handleDeleteUser(u.id)}
-                                className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50"
-                              >
-                                삭제
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
-                          검색 결과가 없습니다.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            )
-          )}
-
-          {activeNav === "products" && (
-            <ProductSection products={products} loading={productsLoading} onSave={handleSaveProduct} onDelete={handleDeleteProduct} />
-          )}
-          {activeNav === "posts" && (
-            <PostSection posts={posts} loading={postsLoading} onSave={handleSavePost} onDelete={handleDeletePost} />
-          )}
-          {activeNav === "ledger" && (
-            ledgerLoading ? (
-              <div className="flex items-center justify-center rounded-2xl bg-white py-24 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">
-                불러오는 중...
-              </div>
-            ) : (
-              <LedgerSection
-                transactions={ledger}
-                onAdd={handleAddLedger}
-                onDelete={handleDeleteLedger}
-                recurringItems={recurring}
-                onAddRecurring={handleAddRecurring}
-                onDeleteRecurring={handleDeleteRecurring}
-                budgets={budgets}
-                onSaveBudget={handleSaveBudget}
-                onDeleteBudget={handleDeleteBudget}
-              />
-            )
-          )}
-          {activeNav === "settings" && <SettingsSection onLogout={onLogout} />}
-        </div>
-      </main>
-
-      {modalUser !== null && (
-        <UserModal user={modalUser.id ? modalUser : null} onClose={() => setModalUser(null)} onSave={handleSaveUser} />
-      )}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// 로그인 화면
-// ----------------------------------------------------------------------------
-function LoginPage({ onLogin }) {
+// ─── 로그인 ───────────────────────────────────────────────────────────────────
+function Login({ onLogin }) {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  const handleLogin = async () => {
-    if (!email || !password) { setError("이메일과 비밀번호를 입력해주세요."); return; }
-    setLoading(true);
-    setError("");
-    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+  const submit = async () => {
+    if (!email || !pw) return setErr("이메일과 비밀번호를 입력해주세요.");
+    setLoading(true); setErr("");
+    const { data, error } = await db.auth.signInWithPassword({ email, password: pw });
     setLoading(false);
-    if (err) {
-      setError("이메일 또는 비밀번호가 올바르지 않아요.");
-    } else {
-      onLogin(data.session);
-    }
+    error ? setErr("이메일 또는 비밀번호가 올바르지 않아요.") : onLogin(data.session);
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl ring-1 ring-slate-100">
-        <div className="mb-8 flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white mb-3">A</div>
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-xl font-bold text-white">A</div>
           <h1 className="text-xl font-bold text-slate-800">관리자 로그인</h1>
-          <p className="mt-1 text-sm text-slate-400">Admin Dashboard</p>
         </div>
-
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">이메일</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="admin@example.com"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-500">비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          {error && (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-500">{error}</p>
-          )}
-
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
+          {[["이메일","email",email,setEmail,"email"],["비밀번호","password",pw,setPw,"current-password"]].map(([label,type,val,set,ac])=>(
+            <div key={label}>
+              <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+              <input type={type} value={val} onChange={e=>set(e.target.value)}
+                autoComplete={ac} onKeyDown={e=>e.key==="Enter"&&submit()}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+          ))}
+          {err && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-500">{err}</p>}
+          <button onClick={submit} disabled={loading}
+            className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60">
             {loading ? "로그인 중..." : "로그인"}
           </button>
         </div>
@@ -2107,44 +70,905 @@ function LoginPage({ onLogin }) {
   );
 }
 
-// ----------------------------------------------------------------------------
-// 앱 루트 (로그인 상태 관리)
-// ----------------------------------------------------------------------------
+// ─── 모달 래퍼 ────────────────────────────────────────────────────────────────
+function Modal({ title, onClose, onSave, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div className="px-6 py-5 space-y-4">{children}</div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-500 hover:bg-slate-100">취소</button>
+          <button onClick={onSave} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return <div><label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>{children}</div>;
+}
+
+const inputCls = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
+const selectCls = inputCls;
+const badgeCls = (color) => `rounded-full px-2.5 py-1 text-xs font-medium ${color}`;
+
+// ─── 공통 테이블 ──────────────────────────────────────────────────────────────
+function Table({ heads, rows, empty }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead><tr className="border-y border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+          {heads.map(h=><th key={h} className="px-6 py-3 font-medium">{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {rows.length === 0
+            ? <tr><td colSpan={heads.length} className="px-6 py-10 text-center text-sm text-slate-400">{empty}</td></tr>
+            : rows}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── 회원 관리 ────────────────────────────────────────────────────────────────
+function Members() {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [menuId, setMenuId] = useState(null);
+  const [search, setSearch] = useState("");
+  const emptyForm = { name:"", email:"", role:"일반", status:"활성", joined: new Date().toISOString().slice(0,10) };
+  const [form, setForm] = useState(emptyForm);
+
+  useEffect(() => {
+    db.from("members").select("*").order("created_at",{ascending:false})
+      .then(({data})=>{ if(data) setList(data); setLoading(false); });
+  }, []);
+
+  const save = async () => {
+    if (!form.name || !form.email) return;
+    if (form.id) {
+      const {data} = await db.from("members").update({name:form.name,email:form.email,role:form.role,status:form.status,joined:form.joined}).eq("id",form.id).select();
+      if(data) setList(p=>p.map(u=>u.id===form.id?data[0]:u));
+    } else {
+      const {data} = await db.from("members").insert([{name:form.name,email:form.email,role:form.role,status:form.status,joined:form.joined}]).select();
+      if(data) setList(p=>[data[0],...p]);
+    }
+    setModal(null);
+  };
+
+  const del = async (id) => {
+    await db.from("members").delete().eq("id",id);
+    setList(p=>p.filter(u=>u.id!==id)); setMenuId(null);
+  };
+
+  const filtered = list.filter(u=>u.name?.includes(search)||u.email?.includes(search));
+
+  if (loading) return <div className="flex justify-center py-24 text-sm text-slate-400 bg-white rounded-2xl ring-1 ring-slate-100">불러오는 중...</div>;
+
+  return (
+    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름/이메일 검색"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none sm:w-64" />
+        <button onClick={()=>{setForm(emptyForm);setModal("edit");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 회원 추가</button>
+      </div>
+      <Table
+        heads={["이름","이메일","역할","상태","가입일","관리"]}
+        empty="등록된 회원이 없습니다."
+        rows={filtered.map(u=>(
+          <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+            <td className="px-6 py-3 font-medium text-slate-700">{u.name}</td>
+            <td className="px-6 py-3 text-slate-500">{u.email}</td>
+            <td className="px-6 py-3 text-slate-500">{u.role}</td>
+            <td className="px-6 py-3"><span className={badgeCls(u.status==="활성"?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-500")}>{u.status}</span></td>
+            <td className="px-6 py-3 text-slate-500">{u.joined}</td>
+            <td className="relative px-6 py-3 text-right">
+              <button onClick={()=>setMenuId(menuId===u.id?null:u.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">⋮</button>
+              {menuId===u.id&&<div className="absolute right-6 top-10 z-10 w-28 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+                <button onClick={()=>{setForm(u);setModal("edit");setMenuId(null);}} className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50">수정</button>
+                <button onClick={()=>del(u.id)} className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50">삭제</button>
+              </div>}
+            </td>
+          </tr>
+        ))}
+      />
+      {modal==="edit" && (
+        <Modal title={form.id?"회원 수정":"회원 추가"} onClose={()=>setModal(null)} onSave={save}>
+          <Field label="이름"><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className={inputCls} /></Field>
+          <Field label="이메일"><input value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} className={inputCls} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="역할"><select value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))} className={selectCls}>
+              {["관리자","매니저","일반"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+            <Field label="상태"><select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} className={selectCls}>
+              {["활성","정지"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+          </div>
+          <Field label="가입일"><input type="date" value={form.joined} onChange={e=>setForm(p=>({...p,joined:e.target.value}))} className={inputCls} /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── 상품 관리 ────────────────────────────────────────────────────────────────
+function Products() {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [menuId, setMenuId] = useState(null);
+  const [search, setSearch] = useState("");
+  const emptyForm = { name:"", category:"의류", price:"", stock:"", status:"판매중" };
+  const [form, setForm] = useState(emptyForm);
+
+  useEffect(() => {
+    db.from("products").select("*").order("created_at",{ascending:false})
+      .then(({data})=>{ if(data) setList(data); setLoading(false); });
+  }, []);
+
+  const save = async () => {
+    if (!form.name) return;
+    const payload = {name:form.name,category:form.category,price:Number(form.price),stock:Number(form.stock),status:form.status};
+    if (form.id) {
+      const {data} = await db.from("products").update(payload).eq("id",form.id).select();
+      if(data) setList(p=>p.map(u=>u.id===form.id?data[0]:u));
+    } else {
+      const {data} = await db.from("products").insert([payload]).select();
+      if(data) setList(p=>[data[0],...p]);
+    }
+    setModal(null);
+  };
+
+  const del = async (id) => {
+    await db.from("products").delete().eq("id",id);
+    setList(p=>p.filter(u=>u.id!==id)); setMenuId(null);
+  };
+
+  const filtered = list.filter(u=>u.name?.includes(search)||u.category?.includes(search));
+  const statusColor = s => s==="판매중"?"bg-emerald-50 text-emerald-600":s==="품절"?"bg-amber-50 text-amber-600":"bg-slate-100 text-slate-400";
+
+  if (loading) return <div className="flex justify-center py-24 text-sm text-slate-400 bg-white rounded-2xl ring-1 ring-slate-100">불러오는 중...</div>;
+
+  return (
+    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 상품명 검색"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none sm:w-64" />
+        <button onClick={()=>{setForm(emptyForm);setModal("edit");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 상품 추가</button>
+      </div>
+      <Table
+        heads={["상품명","카테고리","가격","재고","상태","관리"]}
+        empty="등록된 상품이 없습니다."
+        rows={filtered.map(u=>(
+          <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+            <td className="px-6 py-3 font-medium text-slate-700">{u.name}</td>
+            <td className="px-6 py-3 text-slate-500">{u.category}</td>
+            <td className="px-6 py-3 text-slate-700">{won(u.price)}</td>
+            <td className="px-6 py-3 text-slate-500">{(u.stock||0).toLocaleString()}개</td>
+            <td className="px-6 py-3"><span className={badgeCls(statusColor(u.status))}>{u.status}</span></td>
+            <td className="relative px-6 py-3 text-right">
+              <button onClick={()=>setMenuId(menuId===u.id?null:u.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">⋮</button>
+              {menuId===u.id&&<div className="absolute right-6 top-10 z-10 w-28 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+                <button onClick={()=>{setForm(u);setModal("edit");setMenuId(null);}} className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50">수정</button>
+                <button onClick={()=>del(u.id)} className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50">삭제</button>
+              </div>}
+            </td>
+          </tr>
+        ))}
+      />
+      {modal==="edit" && (
+        <Modal title={form.id?"상품 수정":"상품 추가"} onClose={()=>setModal(null)} onSave={save}>
+          <Field label="상품명"><input value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} className={inputCls} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="카테고리"><select value={form.category} onChange={e=>setForm(p=>({...p,category:e.target.value}))} className={selectCls}>
+              {["의류","식품","전자기기","생활용품","뷰티","기타"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+            <Field label="상태"><select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} className={selectCls}>
+              {["판매중","품절","판매중지"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="가격 (원)"><input type="number" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))} className={inputCls} /></Field>
+            <Field label="재고"><input type="number" value={form.stock} onChange={e=>setForm(p=>({...p,stock:e.target.value}))} className={inputCls} /></Field>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── 게시글 관리 ──────────────────────────────────────────────────────────────
+function Posts() {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [menuId, setMenuId] = useState(null);
+  const [search, setSearch] = useState("");
+  const emptyForm = { title:"", content:"", category:"공지", status:"게시중" };
+  const [form, setForm] = useState(emptyForm);
+
+  useEffect(() => {
+    db.from("posts").select("*").order("created_at",{ascending:false})
+      .then(({data})=>{ if(data) setList(data); setLoading(false); });
+  }, []);
+
+  const save = async () => {
+    if (!form.title) return;
+    const payload = {title:form.title,content:form.content,category:form.category,status:form.status};
+    if (form.id) {
+      const {data} = await db.from("posts").update(payload).eq("id",form.id).select();
+      if(data) setList(p=>p.map(u=>u.id===form.id?data[0]:u));
+    } else {
+      const {data} = await db.from("posts").insert([payload]).select();
+      if(data) setList(p=>[data[0],...p]);
+    }
+    setModal(null);
+  };
+
+  const del = async (id) => {
+    await db.from("posts").delete().eq("id",id);
+    setList(p=>p.filter(u=>u.id!==id)); setMenuId(null);
+  };
+
+  const filtered = list.filter(u=>u.title?.includes(search)||u.category?.includes(search));
+  const statusColor = s => s==="게시중"?"bg-emerald-50 text-emerald-600":s==="숨김"?"bg-amber-50 text-amber-600":"bg-rose-50 text-rose-500";
+
+  if (loading) return <div className="flex justify-center py-24 text-sm text-slate-400 bg-white rounded-2xl ring-1 ring-slate-100">불러오는 중...</div>;
+
+  return (
+    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 제목 검색"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none sm:w-64" />
+        <button onClick={()=>{setForm(emptyForm);setModal("edit");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 게시글 작성</button>
+      </div>
+      <Table
+        heads={["제목","카테고리","상태","작성일","관리"]}
+        empty="등록된 게시글이 없습니다."
+        rows={filtered.map(u=>(
+          <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+            <td className="px-6 py-3 font-medium text-slate-700">{u.title}</td>
+            <td className="px-6 py-3 text-slate-500">{u.category}</td>
+            <td className="px-6 py-3"><span className={badgeCls(statusColor(u.status))}>{u.status}</span></td>
+            <td className="px-6 py-3 text-slate-500">{u.created_at?.slice(0,10)}</td>
+            <td className="relative px-6 py-3 text-right">
+              <button onClick={()=>setMenuId(menuId===u.id?null:u.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">⋮</button>
+              {menuId===u.id&&<div className="absolute right-6 top-10 z-10 w-28 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+                <button onClick={()=>{setForm(u);setModal("edit");setMenuId(null);}} className="block w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50">수정</button>
+                <button onClick={()=>del(u.id)} className="block w-full px-4 py-2 text-left text-sm text-rose-500 hover:bg-rose-50">삭제</button>
+              </div>}
+            </td>
+          </tr>
+        ))}
+      />
+      {modal==="edit" && (
+        <Modal title={form.id?"게시글 수정":"게시글 작성"} onClose={()=>setModal(null)} onSave={save}>
+          <Field label="제목"><input value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} className={inputCls} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="카테고리"><select value={form.category} onChange={e=>setForm(p=>({...p,category:e.target.value}))} className={selectCls}>
+              {["공지","이벤트","FAQ","자유","기타"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+            <Field label="상태"><select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} className={selectCls}>
+              {["게시중","숨김","삭제"].map(v=><option key={v}>{v}</option>)}
+            </select></Field>
+          </div>
+          <Field label="내용"><textarea value={form.content} onChange={e=>setForm(p=>({...p,content:e.target.value}))} rows={4} className={inputCls + " resize-none"} /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── 가계부 ───────────────────────────────────────────────────────────────────
+const expCats = ["식비","교통","주거/통신","문화/여가","의료","쇼핑","기타"];
+const incCats = ["월급","용돈","부수입","기타"];
+
+function LedgerChart({ data }) {
+  const ref = useRef(null);
+  const chart = useRef(null);
+  useEffect(() => {
+    if (!data.length) return;
+    const months = {};
+    data.forEach(t => {
+      const m = t.date?.slice(0,7); if(!m) return;
+      if(!months[m]) months[m] = {inc:0,exp:0};
+      t.type==="수입" ? months[m].inc+=t.amount : months[m].exp+=t.amount;
+    });
+    const labels = Object.keys(months).sort();
+    if(chart.current) chart.current.destroy();
+    chart.current = new Chart(ref.current, {
+      type:"bar",
+      data:{ labels:labels.map(l=>l.slice(5)+"월"), datasets:[
+        {label:"수입",data:labels.map(l=>months[l].inc),backgroundColor:"#34d399",borderRadius:6},
+        {label:"지출",data:labels.map(l=>months[l].exp),backgroundColor:"#fb7185",borderRadius:6},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:11}}}},
+        scales:{y:{ticks:{callback:v=>v>=1000000?v/1000000+"M":v>=1000?v/1000+"K":v,font:{size:11}}},x:{ticks:{font:{size:11}}}}}
+    });
+    return () => chart.current?.destroy();
+  }, [data]);
+  return <div className="h-56"><canvas ref={ref}/></div>;
+}
+
+const COLORS = ["#6366f1","#fb7185","#34d399","#fbbf24","#38bdf8","#a78bfa","#f472b6","#94a3b8"];
+
+function DonutChart({ data }) {
+  const ref = useRef(null);
+  const chart = useRef(null);
+  const expenses = data.filter(t=>t.type==="지출");
+  const totals = {};
+  expenses.forEach(t=>{ totals[t.category]=(totals[t.category]||0)+t.amount; });
+  const labels = Object.keys(totals).sort((a,b)=>totals[b]-totals[a]);
+  const total = labels.reduce((s,l)=>s+totals[l],0);
+
+  useEffect(() => {
+    if(!labels.length) return;
+    if(chart.current) chart.current.destroy();
+    chart.current = new Chart(ref.current, {
+      type:"doughnut",
+      data:{labels,datasets:[{data:labels.map(l=>totals[l]),backgroundColor:labels.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:"62%",plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${won(ctx.parsed)} (${total?Math.round(ctx.parsed/total*100):0}%)`}}}}
+    });
+    return () => chart.current?.destroy();
+  }, [data]);
+
+  if(!labels.length) return <div className="flex h-48 items-center justify-center text-sm text-slate-400">지출 내역이 없습니다.</div>;
+
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="h-48 w-48 shrink-0 mx-auto"><canvas ref={ref}/></div>
+      <div className="flex-1 space-y-1.5">
+        {labels.map((l,i)=>(
+          <div key={l} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:COLORS[i%COLORS.length]}}/>
+              <span className="text-slate-600">{l}</span>
+            </div>
+            <div className="flex gap-2 text-xs">
+              <span className="text-slate-400">{total?Math.round(totals[l]/total*100):0}%</span>
+              <span className="font-medium text-slate-700">{won(totals[l])}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Ledger() {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [recurring, setRecurring] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [modal, setModal] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const emptyForm = { type:"지출", category:expCats[0], amount:"", date:new Date().toISOString().slice(0,10), memo:"" };
+  const emptyRec = { type:"지출", category:expCats[0], amount:"", day_of_month:"1", memo:"" };
+  const emptyBudget = { category:expCats[0], amount:"" };
+  const [form, setForm] = useState(emptyForm);
+  const [recForm, setRecForm] = useState(emptyRec);
+  const [budgetForm, setBudgetForm] = useState(emptyBudget);
+
+  useEffect(() => {
+    Promise.all([
+      db.from("ledger").select("*").order("date",{ascending:false}),
+      db.from("recurring_items").select("*").eq("active",true).order("day_of_month",{ascending:true}),
+      db.from("budgets").select("*").order("category"),
+    ]).then(([l,r,b])=>{
+      if(l.data) setList(l.data);
+      if(r.data) setRecurring(r.data);
+      if(b.data) setBudgets(b.data);
+      setLoading(false);
+    });
+  }, []);
+
+  // 고정 지출 자동 등록
+  useEffect(() => {
+    if(loading||!recurring.length) return;
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth()+1).padStart(2,"0");
+    const day = today.getDate();
+    const toAdd = recurring.filter(item=>{
+      if(day<item.day_of_month) return false;
+      return !list.some(t=>t.recurring_id===item.id&&t.date?.slice(0,7)===`${yyyy}-${mm}`);
+    });
+    if(!toAdd.length) return;
+    const entries = toAdd.map(item=>({
+      type:item.type,category:item.category,amount:item.amount,
+      date:`${yyyy}-${mm}-${String(Math.min(item.day_of_month,28)).padStart(2,"0")}`,
+      memo:item.memo,recurring_id:item.id
+    }));
+    db.from("ledger").insert(entries).select().then(({data})=>{ if(data) setList(p=>[...p,...data]); });
+  }, [loading, recurring]);
+
+  const addLedger = async () => {
+    if(!form.amount) return;
+    const {data} = await db.from("ledger").insert([{...form,amount:Number(form.amount)}]).select();
+    if(data) setList(p=>[data[0],...p]);
+    setModal(null);
+  };
+
+  const delLedger = async (id) => {
+    await db.from("ledger").delete().eq("id",id);
+    setList(p=>p.filter(t=>t.id!==id));
+  };
+
+  const addRec = async () => {
+    if(!recForm.amount) return;
+    const {data} = await db.from("recurring_items").insert([{...recForm,amount:Number(recForm.amount),day_of_month:Number(recForm.day_of_month),active:true}]).select();
+    if(data) setRecurring(p=>[...p,data[0]]);
+    setModal(null);
+  };
+
+  const delRec = async (id) => {
+    await db.from("recurring_items").delete().eq("id",id);
+    setRecurring(p=>p.filter(r=>r.id!==id));
+  };
+
+  const saveBudget = async () => {
+    if(!budgetForm.amount) return;
+    const existing = budgets.find(b=>b.category===budgetForm.category);
+    if(existing) {
+      const {data} = await db.from("budgets").update({amount:Number(budgetForm.amount)}).eq("id",existing.id).select();
+      if(data) setBudgets(p=>p.map(b=>b.id===existing.id?data[0]:b));
+    } else {
+      const {data} = await db.from("budgets").insert([{category:budgetForm.category,amount:Number(budgetForm.amount)}]).select();
+      if(data) setBudgets(p=>[...p,data[0]]);
+    }
+    setModal(null);
+  };
+
+  const delBudget = async (id) => {
+    await db.from("budgets").delete().eq("id",id);
+    setBudgets(p=>p.filter(b=>b.id!==id));
+  };
+
+  const exportCSV = () => {
+    if(!filtered.length) return alert("내보낼 내역이 없어요.");
+    const rows = [["날짜","구분","분류","메모","금액"],...filtered.map(t=>[t.date,t.type,t.category,t.memo||"",t.amount])];
+    const csv = rows.map(r=>r.map(v=>{const s=String(v);return s.includes(",")?`"${s}"`:s;}).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `가계부_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const years = [...new Set(list.map(t=>t.date?.slice(0,4)))].sort().reverse();
+  const months = [...new Set(list.map(t=>t.date?.slice(0,7)))].sort().reverse();
+
+  let filtered = list;
+  if(filterType==="year"&&filterYear) filtered=list.filter(t=>t.date?.startsWith(filterYear));
+  else if(filterType==="month"&&filterMonth) filtered=list.filter(t=>t.date?.startsWith(filterMonth));
+  else if(filterType==="range") filtered=list.filter(t=>(!rangeStart||t.date>=rangeStart)&&(!rangeEnd||t.date<=rangeEnd));
+
+  const income = filtered.filter(t=>t.type==="수입").reduce((s,t)=>s+t.amount,0);
+  const expense = filtered.filter(t=>t.type==="지출").reduce((s,t)=>s+t.amount,0);
+
+  const today = new Date();
+  const thisMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`;
+  const monthExp = {};
+  list.filter(t=>t.type==="지출"&&t.date?.slice(0,7)===thisMonth).forEach(t=>{monthExp[t.category]=(monthExp[t.category]||0)+t.amount;});
+
+  if(loading) return <div className="flex justify-center py-24 text-sm text-slate-400 bg-white rounded-2xl ring-1 ring-slate-100">불러오는 중...</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* 필터 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-sm text-slate-500">기간</label>
+        <select value={filterType} onChange={e=>setFilterType(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none">
+          <option value="all">전체</option>
+          <option value="year">연도별</option>
+          <option value="month">월별</option>
+          <option value="range">기간 선택</option>
+        </select>
+        {filterType==="year"&&<select value={filterYear} onChange={e=>setFilterYear(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none">
+          <option value="">연도 선택</option>{years.map(y=><option key={y} value={y}>{y}년</option>)}
+        </select>}
+        {filterType==="month"&&<select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none">
+          <option value="">월 선택</option>{months.map(m=><option key={m} value={m}>{m.slice(0,4)}년 {m.slice(5)}월</option>)}
+        </select>}
+        {filterType==="range"&&<div className="flex items-center gap-2">
+          <input type="date" value={rangeStart} onChange={e=>setRangeStart(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"/>
+          <span className="text-slate-400">~</span>
+          <input type="date" value={rangeEnd} onChange={e=>setRangeEnd(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none"/>
+        </div>}
+      </div>
+
+      {/* 요약 카드 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[["총 수입",income,"bg-emerald-500"],["총 지출",expense,"bg-rose-500"],["잔액",income-expense,"bg-indigo-500"]].map(([label,val,color])=>(
+          <div key={label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+            <div className={`mb-3 h-1.5 w-10 rounded-full ${color}`}/>
+            <p className="text-sm text-slate-400">{label}</p>
+            <p className={`mt-1 text-2xl font-bold ${val<0?"text-rose-500":"text-slate-800"}`}>{won(val)}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 월별 차트 */}
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <p className="mb-3 text-sm font-semibold text-slate-700">월별 수입 / 지출</p>
+        <LedgerChart data={list}/>
+      </div>
+
+      {/* 카테고리별 차트 */}
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <p className="mb-3 text-sm font-semibold text-slate-700">카테고리별 지출</p>
+        <DonutChart data={filtered}/>
+      </div>
+
+      {/* 내역 테이블 */}
+      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="flex items-center justify-between px-6 py-4">
+          <p className="text-sm text-slate-400">총 {filtered.length}건</p>
+          <div className="flex gap-2">
+            <button onClick={exportCSV} className="rounded-lg border border-slate-200 px-3.5 py-2 text-sm text-slate-600 hover:bg-slate-50">CSV 내보내기</button>
+            <button onClick={()=>{setForm(emptyForm);setModal("ledger");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 내역 추가</button>
+          </div>
+        </div>
+        <Table
+          heads={["날짜","구분","분류","메모","금액","관리"]}
+          empty="아직 등록된 내역이 없습니다."
+          rows={filtered.map(t=>(
+            <tr key={t.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+              <td className="px-6 py-3 text-slate-500">{t.date}</td>
+              <td className="px-6 py-3"><span className={badgeCls(t.type==="수입"?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-500")}>{t.type}</span></td>
+              <td className="px-6 py-3 text-slate-500">{t.category}</td>
+              <td className="px-6 py-3 text-slate-500">{t.memo||"-"}</td>
+              <td className={`px-6 py-3 text-right font-medium ${t.type==="수입"?"text-emerald-600":"text-rose-500"}`}>
+                {t.type==="수입"?"+":"-"}{won(t.amount)}
+              </td>
+              <td className="px-6 py-3 text-right">
+                <button onClick={()=>delLedger(t.id)} className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-500">삭제</button>
+              </td>
+            </tr>
+          ))}
+        />
+      </div>
+
+      {/* 예산 설정 */}
+      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div><p className="text-sm font-semibold text-slate-700">카테고리별 예산</p><p className="text-xs text-slate-400">이번 달 기준</p></div>
+          <button onClick={()=>{setBudgetForm(emptyBudget);setModal("budget");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 예산 추가</button>
+        </div>
+        <div className="divide-y divide-slate-50 px-6 pb-4">
+          {!budgets.length&&<p className="py-6 text-center text-sm text-slate-400">설정된 예산이 없습니다.</p>}
+          {budgets.map(b=>{
+            const spent=monthExp[b.category]||0;
+            const pct=Math.min(100,Math.round(spent/b.amount*100));
+            const over=spent>b.amount;
+            return (
+              <div key={b.id} className="py-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-slate-700">{b.category}</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={over?"font-semibold text-rose-500":"text-slate-500"}>{won(spent)}</span>
+                    <span className="text-slate-300">/</span>
+                    <span className="text-slate-400">{won(b.amount)}</span>
+                    <button onClick={()=>delBudget(b.id)} className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500">삭제</button>
+                  </div>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-100">
+                  <div className={`h-2 rounded-full ${over?"bg-rose-400":pct>=80?"bg-amber-400":"bg-emerald-400"}`} style={{width:`${pct}%`}}/>
+                </div>
+                <p className="mt-0.5 text-right text-xs text-slate-400">
+                  {over?<span className="text-rose-500">한도 초과 {won(spent-b.amount)}</span>:<span>남은 예산 {won(b.amount-spent)}</span>}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 고정 지출/수입 */}
+      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div><p className="text-sm font-semibold text-slate-700">고정 지출 / 수입</p><p className="text-xs text-slate-400">매월 자동 등록</p></div>
+          <button onClick={()=>{setRecForm(emptyRec);setModal("recurring");}} className="rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ 추가</button>
+        </div>
+        <div className="divide-y divide-slate-50">
+          {!recurring.length&&<p className="px-6 py-6 text-center text-sm text-slate-400">등록된 고정 항목이 없습니다.</p>}
+          {recurring.map(r=>(
+            <div key={r.id} className="flex items-center justify-between px-6 py-3">
+              <div className="flex items-center gap-3">
+                <span className={badgeCls(r.type==="수입"?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-500")}>{r.type}</span>
+                <div>
+                  <p className="text-sm font-medium text-slate-700">{r.category}{r.memo?` · ${r.memo}`:""}</p>
+                  <p className="text-xs text-slate-400">매월 {r.day_of_month}일</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${r.type==="수입"?"text-emerald-600":"text-rose-500"}`}>{r.type==="수입"?"+":"-"}{won(r.amount)}</span>
+                <button onClick={()=>delRec(r.id)} className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-500">삭제</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 내역 추가 모달 */}
+      {modal==="ledger"&&(
+        <Modal title="내역 추가" onClose={()=>setModal(null)} onSave={addLedger}>
+          <div className="grid grid-cols-2 gap-2">
+            {["지출","수입"].map(t=>(
+              <button key={t} onClick={()=>setForm(p=>({...p,type:t,category:t==="지출"?expCats[0]:incCats[0]}))}
+                className={`rounded-lg border py-2 text-sm font-semibold transition-colors ${form.type===t?(t==="지출"?"border-rose-200 bg-rose-50 text-rose-600":"border-emerald-200 bg-emerald-50 text-emerald-600"):"border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{t}</button>
+            ))}
+          </div>
+          <Field label="금액"><input type="number" inputMode="numeric" value={form.amount} onChange={e=>setForm(p=>({...p,amount:e.target.value}))} className={inputCls} placeholder="0"/></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="분류"><select value={form.category} onChange={e=>setForm(p=>({...p,category:e.target.value}))} className={selectCls}>
+              {(form.type==="지출"?expCats:incCats).map(c=><option key={c}>{c}</option>)}
+            </select></Field>
+            <Field label="날짜"><input type="date" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} className={inputCls}/></Field>
+          </div>
+          <Field label="메모"><input value={form.memo} onChange={e=>setForm(p=>({...p,memo:e.target.value}))} className={inputCls} placeholder="예: 점심 식사"/></Field>
+        </Modal>
+      )}
+
+      {/* 고정 항목 추가 모달 */}
+      {modal==="recurring"&&(
+        <Modal title="고정 지출/수입 추가" onClose={()=>setModal(null)} onSave={addRec}>
+          <div className="grid grid-cols-2 gap-2">
+            {["지출","수입"].map(t=>(
+              <button key={t} onClick={()=>setRecForm(p=>({...p,type:t,category:t==="지출"?expCats[0]:incCats[0]}))}
+                className={`rounded-lg border py-2 text-sm font-semibold transition-colors ${recForm.type===t?(t==="지출"?"border-rose-200 bg-rose-50 text-rose-600":"border-emerald-200 bg-emerald-50 text-emerald-600"):"border-slate-200 text-slate-400 hover:bg-slate-50"}`}>{t}</button>
+            ))}
+          </div>
+          <Field label="금액"><input type="number" inputMode="numeric" value={recForm.amount} onChange={e=>setRecForm(p=>({...p,amount:e.target.value}))} className={inputCls} placeholder="0"/></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="분류"><select value={recForm.category} onChange={e=>setRecForm(p=>({...p,category:e.target.value}))} className={selectCls}>
+              {(recForm.type==="지출"?expCats:incCats).map(c=><option key={c}>{c}</option>)}
+            </select></Field>
+            <Field label="매월 며칠"><input type="number" min="1" max="31" value={recForm.day_of_month} onChange={e=>setRecForm(p=>({...p,day_of_month:e.target.value}))} className={inputCls}/></Field>
+          </div>
+          <Field label="메모"><input value={recForm.memo} onChange={e=>setRecForm(p=>({...p,memo:e.target.value}))} className={inputCls} placeholder="예: 월세, 넷플릭스"/></Field>
+        </Modal>
+      )}
+
+      {/* 예산 추가 모달 */}
+      {modal==="budget"&&(
+        <Modal title="예산 설정" onClose={()=>setModal(null)} onSave={saveBudget}>
+          <Field label="카테고리"><select value={budgetForm.category} onChange={e=>setBudgetForm(p=>({...p,category:e.target.value}))} className={selectCls}>
+            {expCats.map(c=><option key={c}>{c}</option>)}
+          </select></Field>
+          <Field label="월 한도 금액"><input type="number" inputMode="numeric" value={budgetForm.amount} onChange={e=>setBudgetForm(p=>({...p,amount:e.target.value}))} className={inputCls} placeholder="0"/></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── 설정 ─────────────────────────────────────────────────────────────────────
+function Settings({ onLogout }) {
+  const [profile, setProfile] = useState({ email:"", name:"" });
+  const [site, setSite] = useState({ id:null, site_name:"관리자 페이지", site_description:"", notification_email:true, notification_system:true });
+  const [pw, setPw] = useState({ next:"", confirm:"" });
+  const [msg, setMsg] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([db.auth.getUser(), db.from("settings").select("*").limit(1).single()])
+      .then(([{data:a},{data:s}])=>{
+        if(a?.user) setProfile({email:a.user.email||"",name:a.user.user_metadata?.name||""});
+        if(s) setSite(s);
+        setLoading(false);
+      });
+  }, []);
+
+  const showMsg = (key, text, ok=true) => { setMsg(p=>({...p,[key]:{text,ok}})); setTimeout(()=>setMsg(p=>({...p,[key]:null})),2500); };
+
+  const saveProfile = async () => {
+    const {error} = await db.auth.updateUser({data:{name:profile.name}});
+    error ? showMsg("profile","저장 실패: "+error.message,false) : showMsg("profile","저장됐어요 ✓");
+  };
+
+  const saveSite = async () => {
+    const {error} = await db.from("settings").update({site_name:site.site_name,site_description:site.site_description,notification_email:site.notification_email,notification_system:site.notification_system,updated_at:new Date().toISOString()}).eq("id",site.id);
+    error ? showMsg("site","저장 실패: "+error.message,false) : showMsg("site","저장됐어요 ✓");
+  };
+
+  const changePw = async () => {
+    if(!pw.next||!pw.confirm) return showMsg("pw","모든 항목을 입력해주세요.",false);
+    if(pw.next!==pw.confirm) return showMsg("pw","비밀번호가 일치하지 않아요.",false);
+    if(pw.next.length<6) return showMsg("pw","6자 이상이어야 해요.",false);
+    const {error} = await db.auth.updateUser({password:pw.next});
+    error ? showMsg("pw","변경 실패: "+error.message,false) : (showMsg("pw","변경됐어요 ✓"), setPw({next:"",confirm:""}));
+  };
+
+  const MsgBox = ({k}) => msg[k] ? <p className={`rounded-lg px-3 py-2 text-xs font-medium ${msg[k].ok?"bg-emerald-50 text-emerald-600":"bg-rose-50 text-rose-500"}`}>{msg[k].text}</p> : null;
+
+  if(loading) return <div className="flex justify-center py-24 text-sm text-slate-400 bg-white rounded-2xl ring-1 ring-slate-100">불러오는 중...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">관리자 정보</h3>
+        <div className="space-y-3">
+          <Field label="이름"><input value={profile.name} onChange={e=>setProfile(p=>({...p,name:e.target.value}))} className={inputCls} placeholder="이름 입력"/></Field>
+          <Field label="이메일 (변경 불가)"><input value={profile.email} disabled className={inputCls+" bg-slate-50 text-slate-400"}/></Field>
+          <MsgBox k="profile"/>
+          <button onClick={saveProfile} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">비밀번호 변경</h3>
+        <div className="space-y-3">
+          <Field label="새 비밀번호"><input type="password" value={pw.next} onChange={e=>setPw(p=>({...p,next:e.target.value}))} className={inputCls} placeholder="••••••••"/></Field>
+          <Field label="새 비밀번호 확인"><input type="password" value={pw.confirm} onChange={e=>setPw(p=>({...p,confirm:e.target.value}))} className={inputCls} placeholder="••••••••"/></Field>
+          <MsgBox k="pw"/>
+          <button onClick={changePw} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">비밀번호 변경</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">사이트 정보</h3>
+        <div className="space-y-3">
+          <Field label="사이트명"><input value={site.site_name} onChange={e=>setSite(p=>({...p,site_name:e.target.value}))} className={inputCls}/></Field>
+          <Field label="사이트 설명"><textarea value={site.site_description||""} onChange={e=>setSite(p=>({...p,site_description:e.target.value}))} rows={3} className={inputCls+" resize-none"}/></Field>
+          <MsgBox k="site"/>
+          <button onClick={saveSite} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-4 text-sm font-semibold text-slate-700">알림 설정</h3>
+        <div className="space-y-3">
+          {[["notification_email","이메일 알림","주요 활동을 이메일로 받기"],["notification_system","시스템 알림","앱 내 알림 받기"]].map(([key,label,desc])=>(
+            <div key={key} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+              <div><p className="text-sm font-medium text-slate-700">{label}</p><p className="text-xs text-slate-400">{desc}</p></div>
+              <button onClick={()=>setSite(p=>({...p,[key]:!p[key]}))}
+                className={`relative h-6 w-11 rounded-full transition-colors ${site[key]?"bg-indigo-600":"bg-slate-200"}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${site[key]?"translate-x-5":"translate-x-0.5"}`}/>
+              </button>
+            </div>
+          ))}
+          <MsgBox k="notify"/>
+          <button onClick={saveSite} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">저장</button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+        <h3 className="mb-2 text-sm font-semibold text-slate-700">계정</h3>
+        <p className="mb-4 text-xs text-slate-400">로그아웃하면 로그인 화면으로 이동해요.</p>
+        <button onClick={onLogout} className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-medium text-rose-500 hover:bg-rose-50">로그아웃</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── 대시보드 ─────────────────────────────────────────────────────────────────
+function Dashboard() {
+  const [stats, setStats] = useState({ members:0, products:0, posts:0, income:0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const today = new Date();
+    const thisMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`;
+    Promise.all([
+      db.from("members").select("id",{count:"exact",head:true}),
+      db.from("products").select("id",{count:"exact",head:true}).eq("status","판매중"),
+      db.from("posts").select("id",{count:"exact",head:true}).eq("status","게시중"),
+      db.from("ledger").select("amount,type").eq("type","수입").gte("date",`${thisMonth}-01`),
+    ]).then(([m,p,po,l])=>{
+      const income=(l.data||[]).reduce((s,t)=>s+t.amount,0);
+      setStats({members:m.count||0,products:p.count||0,posts:po.count||0,income});
+      setLoading(false);
+    });
+  }, []);
+
+  const cards = [
+    ["전체 회원", loading?"...":`${stats.members.toLocaleString()}명`, "bg-indigo-500"],
+    ["활성 상품", loading?"...":`${stats.products.toLocaleString()}개`, "bg-emerald-500"],
+    ["게시 중인 글", loading?"...":`${stats.posts.toLocaleString()}개`, "bg-amber-500"],
+    ["이번 달 수입", loading?"...":won(stats.income), "bg-rose-500"],
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map(([label,value,color])=>(
+        <div key={label} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+          <div className={`mb-3 h-1.5 w-10 rounded-full ${color}`}/>
+          <p className="text-sm text-slate-400">{label}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-800">{value}</p>
+        </div>
+      ))}
+      <div className="col-span-full rounded-2xl bg-white p-6 text-sm text-slate-400 shadow-sm ring-1 ring-slate-100">
+        왼쪽 메뉴에서 각 항목을 눌러 데이터를 관리하세요. 회원, 상품, 게시글, 가계부 모두 실시간 저장돼요.
+      </div>
+    </div>
+  );
+}
+
+// ─── 메인 앱 ──────────────────────────────────────────────────────────────────
+const navItems = [
+  { id:"dashboard", label:"대시보드", icon:"▦" },
+  { id:"members",   label:"회원 관리",   icon:"👤" },
+  { id:"products",  label:"상품 관리",  icon:"📦" },
+  { id:"posts",     label:"게시글 관리",    icon:"📝" },
+  { id:"ledger",    label:"가계부",    icon:"💰" },
+  { id:"settings",  label:"설정",  icon:"⚙️" },
+];
+
+function AdminDashboard({ onLogout }) {
+  const [nav, setNav] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const pages = { dashboard:<Dashboard/>, members:<Members/>, products:<Products/>, posts:<Posts/>, ledger:<Ledger/>, settings:<Settings onLogout={onLogout}/> };
+
+  return (
+    <div className="flex h-screen w-full bg-slate-50 text-slate-800">
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-slate-200 bg-white transition-transform md:relative md:translate-x-0 ${sidebarOpen?"translate-x-0":"-translate-x-full"}`}>
+        <div className="flex items-center gap-2 px-6 py-5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">A</div>
+          <span className="text-lg font-bold text-slate-800">Admin</span>
+        </div>
+        <nav className="mt-2 flex-1 space-y-1 px-3">
+          {navItems.map(item=>(
+            <button key={item.id} onClick={()=>{setNav(item.id);setSidebarOpen(false);}}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${nav===item.id?"bg-indigo-50 text-indigo-600":"text-slate-500 hover:bg-slate-50 hover:text-slate-700"}`}>
+              <span className="text-base">{item.icon}</span>{item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="border-t border-slate-100 px-4 py-4">
+          <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">관</div>
+            <div className="flex-1 leading-tight">
+              <p className="text-sm font-semibold text-slate-700">관리자</p>
+            </div>
+            <button onClick={onLogout} className="rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-200">로그아웃</button>
+          </div>
+        </div>
+      </aside>
+
+      {sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/30 md:hidden"/>}
+
+      <main className="flex-1 overflow-y-auto">
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 md:px-8">
+          <div className="flex items-center gap-3">
+            <button onClick={()=>setSidebarOpen(true)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden">☰</button>
+            <h1 className="text-xl font-bold text-slate-800">{navItems.find(n=>n.id===nav)?.label}</h1>
+          </div>
+        </header>
+        <div className="p-4 md:p-8">{pages[nav]}</div>
+      </main>
+    </div>
+  );
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setChecking(false);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-    return () => listener.subscription.unsubscribe();
+    db.auth.getSession().then(({data})=>{ setSession(data.session); setChecking(false); });
+    const {data:listener} = db.auth.onAuthStateChange((_,s)=>setSession(s));
+    return ()=>listener.subscription.unsubscribe();
   }, []);
 
-  if (checking) return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">
-      로딩 중...
-    </div>
-  );
-
-  if (!session) return <LoginPage onLogin={setSession} />;
-
-  return <AdminDashboard onLogout={() => supabase.auth.signOut()} />;
+  if(checking) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-400">로딩 중...</div>;
+  if(!session) return <Login onLogin={setSession}/>;
+  return <AdminDashboard onLogout={()=>db.auth.signOut()}/>;
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-} catch (err) {
-  document.getElementById("root").innerHTML =
-    '<div style="padding:20px;font-family:monospace;color:#b91c1c;white-space:pre-wrap;font-size:12px;line-height:1.6;">' +
-    '오류 발생 (코드):\n' +
-    (err && err.message ? err.message : String(err)) + '\n\n' +
-    (err && err.stack ? err.stack : '') +
-    '</div>';
-}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
